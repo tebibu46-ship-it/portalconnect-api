@@ -100,8 +100,9 @@ def test_cors_middleware_allows_preflight_requests():
     assert response.headers["access-control-allow-origin"] == "*"
 
 
-def test_root_redirects_to_api_docs():
-    response = TestClient(app).get("/", follow_redirects=False)
+def test_root_returns_html_dashboard():
+    response = TestClient(app).get("/")
 
-    assert response.status_code == 307
-    assert response.headers["location"] == "/docs"
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "PortalConnect Container Tracker" in response.text

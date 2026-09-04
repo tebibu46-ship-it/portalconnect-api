@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PortalConnect Container Tracker</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = { darkMode: "class" };
+  </script>
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 antialiased">
+  <main class="mx-auto flex min-h-screen max-w-6xl items-center px-6 py-12">
+    <section class="w-full">
+      <div class="mb-10 flex items-center justify-between gap-4">
+        <div>
+          <p class="mb-3 text-sm font-semibold uppercase tracking-[0.3em] text-cyan-400">PortalConnect API</p>
+          <h1 class="text-4xl font-bold tracking-tight sm:text-5xl">Container Tracker</h1>
+          <p class="mt-4 max-w-2xl text-slate-400">A clear view into container status across legacy terminal portals.</p>
+        </div>
+        <a href="/docs" class="hidden rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 transition hover:border-cyan-400 hover:text-cyan-300 sm:block">API Docs</a>
+      </div>
+
+      <div class="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div class="rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/20 sm:p-8">
+          <div class="mb-8 flex items-center gap-3">
+            <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/10 text-xl text-cyan-300">↗</span>
+            <div>
+              <h2 class="font-semibold">Track a shipment</h2>
+              <p class="text-sm text-slate-400">Enter the terminal and container details.</p>
+            </div>
+          </div>
+
+          <form id="lookup-form" class="space-y-5">
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-300">Terminal</span>
+              <select id="terminal-code" required class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-slate-100 outline-none transition focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
+                <option value="">Loading terminals…</option>
+              </select>
+            </label>
+            <label class="block">
+              <span class="mb-2 block text-sm font-medium text-slate-300">Container ID</span>
+              <input id="container-id" required pattern="[A-Za-z]{4}[0-9]{7}" maxlength="11" placeholder="MSKU9018231" class="w-full rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 uppercase tracking-wider text-slate-100 outline-none transition placeholder:text-slate-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20">
+            </label>
+            <button id="submit-button" type="submit" class="flex w-full items-center justify-center gap-3 rounded-xl bg-cyan-400 px-4 py-3 font-bold text-slate-950 transition hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-60">
+              <span id="spinner" class="hidden h-4 w-4 animate-spin rounded-full border-2 border-slate-950 border-t-transparent"></span>
+              <span id="button-label">Track Container</span>
+            </button>
+          </form>
+          <div id="error-banner" role="alert" class="mt-5 hidden rounded-xl border border-rose-400/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-300"></div>
+        </div>
+
+        <div id="result-card" class="hidden rounded-2xl border border-slate-800 bg-slate-900/80 p-6 shadow-2xl shadow-cyan-950/20 sm:p-8">
+          <div class="mb-7 flex items-start justify-between gap-4">
+            <div>
+              <p class="text-sm text-slate-400">Latest lookup</p>
+              <h2 id="result-container" class="mt-1 font-mono text-2xl font-bold tracking-wider"></h2>
+            </div>
+            <span id="status-badge" class="rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider"></span>
+          </div>
+          <dl class="divide-y divide-slate-800 text-sm">
+            <div class="flex justify-between gap-4 py-3"><dt class="text-slate-400">Terminal</dt><dd id="result-terminal" class="text-right font-medium"></dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt class="text-slate-400">Last free day</dt><dd id="result-free-day" class="text-right font-medium"></dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt class="text-slate-400">Location / Yard</dt><dd id="result-location" class="text-right font-medium"></dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt class="text-slate-400">Customs hold</dt><dd id="result-customs" class="text-right font-medium"></dd></div>
+            <div class="flex justify-between gap-4 py-3"><dt class="text-slate-400">Fees due</dt><dd id="result-fees" class="text-right font-medium"></dd></div>
+          </dl>
+        </div>
+      </div>
+      <p class="mt-8 text-center text-xs text-slate-600">Protected lookup · Powered by PortalConnect</p>
+    </section>
+  </main>
+
+  <script>
+    const API_KEY = "test_secret_key";
+    const terminalSelect = document.getElementById("terminal-code");
+    const form = document.getElementById("lookup-form");
+    const button = document.getElementById("submit-button");
+    const spinner = document.getElementById("spinner");
+    const buttonLabel = document.getElementById("button-label");
+    const errorBanner = document.getElementById("error-banner");
+    const resultCard = document.getElementById("result-card");
+
+    function showError(message) {
+      errorBanner.textContent = message;
+      errorBanner.classList.remove("hidden");
+    }
+
+    function setLoading(loading) {
+      button.disabled = loading;
+      spinner.classList.toggle("hidden", !loading);
+      buttonLabel.textContent = loading ? "Checking portal…" : "Track Container";
+    }
+
+    function renderResult(data) {
+      document.getElementById("result-container").textContent = data.container_id;
+      document.getElementById("result-terminal").textContent = data.terminal_name;
+      document.getElementById("result-free-day").textContent = data.last_free_day;
+      document.getElementById("result-location").textContent = data.location;
+      document.getElementById("result-customs").textContent = data.customs_hold ? "Yes" : "No";
+      document.getElementById("result-fees").textContent = `$${Number(data.fees_due).toFixed(2)}`;
+      const badge = document.getElementById("status-badge");
+      const status = String(data.status || "UNKNOWN").toUpperCase();
+      badge.textContent = status;
+      badge.className = "rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider " +
+        (status.includes("FEES") ? "bg-rose-400/15 text-rose-300" : status.includes("HOLD") ? "bg-amber-400/15 text-amber-300" : "bg-emerald-400/15 text-emerald-300");
+      resultCard.classList.remove("hidden");
+    }
+
+    async function loadTerminals() {
+      try {
+        const response = await fetch("/v1/terminals");
+        if (!response.ok) throw new Error("Unable to load terminals");
+        const terminals = await response.json();
+        terminalSelect.innerHTML = Object.entries(terminals).map(([code, name]) =>
+          `<option value="${code}">${name.replaceAll("-", " ")}</option>`
+        ).join("");
+      } catch (error) {
+        terminalSelect.innerHTML = "<option value=\"la_pier_400\">la pier 400</option>";
+        showError("Terminal list could not be loaded. You can still try the default terminal.");
+      }
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      errorBanner.classList.add("hidden");
+      resultCard.classList.add("hidden");
+      setLoading(true);
+      try {
+        const response = await fetch("/v1/container/lookup", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-API-Key": API_KEY },
+          body: JSON.stringify({ terminal_code: terminalSelect.value, container_id: document.getElementById("container-id").value.trim().toUpperCase() })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.message || data.detail || "Lookup failed");
+        renderResult(data);
+      } catch (error) {
+        showError(error.message || "Lookup failed. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    loadTerminals();
+  </script>
+</body>
+</html>

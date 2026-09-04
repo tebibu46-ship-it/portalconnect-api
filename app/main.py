@@ -1,11 +1,12 @@
 """FastAPI application entrypoint."""
 
 import logging
+from pathlib import Path
 import traceback
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.routes import router
 from app.models.schemas import ErrorResponse
@@ -24,10 +25,13 @@ app.add_middleware(
 
 
 @app.get("/", include_in_schema=False)
-async def root() -> RedirectResponse:
-    """Redirect visitors to the interactive API documentation."""
+async def root() -> FileResponse:
+    """Serve the interactive container tracking dashboard."""
 
-    return RedirectResponse(url="/docs")
+    return FileResponse(
+        Path(__file__).parent / "templates" / "index.html",
+        media_type="text/html",
+    )
 
 
 def _error_response(status_code: int, error_code: str, message: str) -> JSONResponse:
