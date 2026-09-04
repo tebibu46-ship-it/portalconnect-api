@@ -40,6 +40,15 @@ class BrowserService:
         });
     """
     TIMEOUT_MS = 15_000
+    LOW_MEMORY_ARGS = [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--single-process",
+        "--no-zygote",
+    ]
+    BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 
     def __init__(self, playwright_factory: Callable[[], Any] | None = None) -> None:
         self._playwright_factory = playwright_factory or self._load_playwright
@@ -51,21 +60,30 @@ class BrowserService:
 
         return async_playwright()
 
+    @classmethod
+    async def _filter_resources(cls, route: Any) -> None:
+        if route.request.resource_type in cls.BLOCKED_RESOURCE_TYPES:
+            await route.abort()
+        else:
+            await route.continue_()
+
     async def capture_portal_state(self, url: str, container_id: str) -> str:
         """Fill a portal tracking form and return a full-page PNG as base64."""
 
         async with self._playwright_factory() as playwright:
             browser = await playwright.chromium.launch(
                 headless=True,
-                args=["--disable-blink-features=AutomationControlled"],
+                args=self.LOW_MEMORY_ARGS,
             )
             context = None
             try:
+                self.last_page_html = None
                 context = await browser.new_context(
                     user_agent=self.DESKTOP_USER_AGENT,
                     viewport=self.VIEWPORT,
                 )
                 await context.add_init_script(self.WEBDRIVER_MASK)
+                await context.route("**/*", self._filter_resources)
                 page = await context.new_page()
                 try:
                     await page.goto(

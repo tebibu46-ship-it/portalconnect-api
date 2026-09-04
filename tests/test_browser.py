@@ -48,6 +48,7 @@ class FakeContext:
     def __init__(self):
         self.init_script = None
         self.page = FakePage()
+        self.route_args = None
         self.closed = False
 
     async def add_init_script(self, script):
@@ -55,6 +56,9 @@ class FakeContext:
 
     async def new_page(self):
         return self.page
+
+    async def route(self, pattern, handler):
+        self.route_args = (pattern, handler)
 
     async def close(self):
         self.closed = True
@@ -115,11 +119,12 @@ def test_capture_portal_state_configures_browser_and_returns_base64():
 
     assert chromium.launch_args == {
         "headless": True,
-        "args": ["--disable-blink-features=AutomationControlled"],
+        "args": BrowserService.LOW_MEMORY_ARGS,
     }
     assert browser.new_context_args["viewport"] == {"width": 1920, "height": 1080}
     assert browser.new_context_args["user_agent"] == BrowserService.DESKTOP_USER_AGENT
     assert "navigator" in context.init_script and "webdriver" in context.init_script
+    assert context.route_args[0] == "**/*"
     assert page.goto_args == ("https://portal.test", "domcontentloaded", 15_000)
     assert page.wait_for_args == ("visible", 15_000)
     assert page.selector == BrowserService.GENERIC_FORM_SELECTOR
@@ -133,6 +138,34 @@ def test_browser_exposes_typed_portal_exceptions():
     assert issubclass(PortalTimeoutError, Exception)
     assert issubclass(PortalUnavailableError, Exception)
     assert issubclass(CaptchaDetectedError, Exception)
+
+
+class FakeRequest:
+    def __init__(self, resource_type):
+        self.resource_type = resource_type
+
+
+class FakeRoute:
+    def __init__(self, resource_type):
+        self.request = FakeRequest(resource_type)
+        self.aborted = False
+        self.continued = False
+
+    async def abort(self):
+        self.aborted = True
+
+    async def continue_(self):
+        self.continued = True
+
+
+def test_resource_filter_blocks_heavy_assets_and_allows_page_resources():
+    image_route = FakeRoute("image")
+    asyncio.run(BrowserService._filter_resources(image_route))
+    assert image_route.aborted is True
+
+    script_route = FakeRoute("script")
+    asyncio.run(BrowserService._filter_resources(script_route))
+    assert script_route.continued is True
 
 
 def test_capture_closes_context_and_browser_when_capture_fails():
