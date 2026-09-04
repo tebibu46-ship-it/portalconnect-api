@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+playwright
+pydantic>=2.0
+pydantic-settings
+openai
+python-dotenv
+pytest
+pytest-asyncio

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "portalconnect-api"
+version = "0.1.0"
+description = "Headless API layer for legacy web portals"
+requires-python = ">=3.11,<3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = ["-ra"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
