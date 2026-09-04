@@ -35,3 +35,9 @@ python -m pytest tests/
 ```
 
 The suite uses mocked browser and OpenAI clients, so it does not require network access, API quotas, or a live portal.
+
+## Free deployment on Render
+
+This repository includes a `render.yaml` Blueprint for zero-touch deployment on Render's free web-service tier. In the Render dashboard, choose **New → Blueprint**, connect this GitHub repository, and select the `main` branch. Render will detect `render.yaml`, build the Dockerfile, configure the service, and use `/healthz` as its health check.
+
+The Blueprint sets `TEST_MODE=true` and a test API key, so the free deployment runs without OpenAI credentials. For production use, replace `API_KEY` with a secret value and disable test mode in the Render service environment.

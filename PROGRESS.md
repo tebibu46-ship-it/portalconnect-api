@@ -111,6 +111,8 @@ All planned tasks are complete and the PortalConnect API MVP is complete.
 - Docker CLI is installed, but `docker build` could not run because the Docker Desktop Linux daemon is not running; no code failure was observed.
 - Added a no-key DOM-table extraction fallback using BeautifulSoup; `BrowserService` now exposes captured page HTML to the parser while retaining screenshot capture.
 - Final post-fallback suite: `python -m pytest tests/` — **32 passed**, with one non-blocking Starlette deprecation warning.
+- Added `render.yaml` Blueprint configuration for zero-touch Render free-tier deployment, including Docker runtime, Oregon region, `/healthz` health checks, and test-mode environment variables.
+- Documented Render Blueprint deployment instructions and free-tier configuration in `README.md`.
 
 ### 1.2
 

@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: portalconnect-api
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: oregon
+    healthCheckPath: /healthz
+    envVars:
+      - key: TEST_MODE
+        value: "true"
+      - key: API_KEY
+        value: "test_secret_key"
+      - key: PORT
+        value: "8000"
