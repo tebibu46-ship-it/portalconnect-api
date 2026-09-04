@@ -43,6 +43,7 @@ class BrowserService:
 
     def __init__(self, playwright_factory: Callable[[], Any] | None = None) -> None:
         self._playwright_factory = playwright_factory or self._load_playwright
+        self.last_page_html: str | None = None
 
     @staticmethod
     def _load_playwright() -> Any:
@@ -84,6 +85,7 @@ class BrowserService:
                             "Portal navigation or element interaction timed out"
                         ) from exc
                     raise
+                self.last_page_html = await page.content()
                 screenshot = await page.screenshot(full_page=True, type="png")
                 return base64.b64encode(screenshot).decode("ascii")
             finally:

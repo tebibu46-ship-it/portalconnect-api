@@ -80,4 +80,5 @@ async def lookup_container(
         )
 
     screenshot = await browser.capture_portal_state(portal_url, request.container_id)
-    return await extractor.extract(screenshot, request.terminal_code)
+    page_html = getattr(browser, "last_page_html", None)
+    return await extractor.extract(page_html or screenshot, request.terminal_code)

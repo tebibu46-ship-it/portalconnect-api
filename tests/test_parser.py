@@ -62,9 +62,17 @@ def test_vision_extractor_uses_deterministic_mock_without_api_key():
         settings=Settings(openai_api_key="", test_mode=False),
     )
 
-    result = asyncio.run(extractor.extract("ignored", "TML-01"))
+    result = asyncio.run(
+        extractor.extract(
+            "<table><tr><th>Container ID</th><td>MSCU1234567</td></tr>"
+            "<tr><th>Status</th><td>AVAILABLE</td></tr></table>",
+            "TML-01",
+        )
+    )
 
-    assert result.model_dump() == VisionExtractor.MOCK_RESPONSE
+    assert result.container_id == "MSCU1234567"
+    assert result.status == "AVAILABLE"
+    assert result.fees_due == 0.0
     assert client.completions.calls == 0
 
 
@@ -92,3 +100,29 @@ def test_vision_extractor_propagates_bad_structured_data():
         asyncio.run(extractor.extract("not-a-real-screenshot", "TML-01"))
 
     assert client.completions.calls == 1
+
+
+def test_extract_dom_maps_table_rows_to_container_status_response():
+    extractor = VisionExtractor(settings=Settings(openai_api_key=""))
+    html = """
+    <table>
+      <tr><th>Container Number</th><td>mscu1234567</td></tr>
+      <tr><th>Status</th><td>AVAILABLE</td></tr>
+      <tr><th>Customs Hold</th><td>YES</td></tr>
+      <tr><th>Fees Due</th><td>$1,234.50</td></tr>
+      <tr><th>Last Free Day</th><td>2026-09-10</td></tr>
+      <tr><th>Location</th><td>YARD-A1</td></tr>
+    </table>
+    """
+
+    result = extractor.extract_dom(html, "ny_red_hook")
+
+    assert result.model_dump() == {
+        "container_id": "MSCU1234567",
+        "terminal_name": "Ny Red Hook",
+        "status": "AVAILABLE",
+        "fees_due": 1234.50,
+        "customs_hold": True,
+        "last_free_day": "2026-09-10",
+        "location": "YARD-A1",
+    }

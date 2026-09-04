@@ -20,7 +20,7 @@ Copy-Item .env.example .env
 uvicorn app.main:app --reload
 ```
 
-When `OPENAI_API_KEY` is empty or `TEST_MODE=true`, extraction uses deterministic offline mock data. Set `API_KEY` in `.env` and send it as `X-API-Key` for protected lookup requests.
+When `OPENAI_API_KEY` is empty, extraction uses the free DOM-table parser; `TEST_MODE=true` uses deterministic offline fixture data. Set `API_KEY` in `.env` and send it as `X-API-Key` for protected lookup requests.
 
 ## API
 

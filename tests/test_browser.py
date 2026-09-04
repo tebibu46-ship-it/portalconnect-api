@@ -35,6 +35,9 @@ class FakePage:
     async def fill(self, value, timeout):
         self.filled_value = value
 
+    async def content(self):
+        return "<html><body>portal</body></html>"
+
     async def screenshot(self, *, full_page, type):
         assert full_page is True
         assert type == "png"
