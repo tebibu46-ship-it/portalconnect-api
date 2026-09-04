@@ -97,3 +97,10 @@ def test_cors_middleware_allows_preflight_requests():
 
     assert response.status_code == 200
     assert response.headers["access-control-allow-origin"] == "*"
+
+
+def test_root_redirects_to_api_docs():
+    response = TestClient(app).get("/", follow_redirects=False)
+
+    assert response.status_code == 307
+    assert response.headers["location"] == "/docs"

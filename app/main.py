@@ -2,7 +2,7 @@
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, RedirectResponse
 
 from app.api.routes import router
 from app.models.schemas import ErrorResponse
@@ -16,6 +16,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/", include_in_schema=False)
+async def root() -> RedirectResponse:
+    """Redirect visitors to the interactive API documentation."""
+
+    return RedirectResponse(url="/docs")
 
 
 def _error_response(status_code: int, error_code: str, message: str) -> JSONResponse:
