@@ -119,3 +119,9 @@ All planned tasks are complete and the PortalConnect API MVP is complete.
 - **Implemented:** Added `app/models/schemas.py` with strict typed request, response, and error contracts; added focused schema validation tests.
 - **Test outcome:** Passing — `python -m pytest tests/test_schemas.py -q` (`6 passed`).
 - **Immediate next task:** 1.3 — Continue with the next unchecked plan item.
+
+## Blockers / Notes
+
+- **Render 500 fix:** The lookup route previously launched Playwright before parser mock-mode handling. It now short-circuits registered terminals, including `la_pier_400`, when `TEST_MODE` is `true`, `1`, or `t`, returning the deterministic fixture without external resources.
+- **Diagnostics:** The global unhandled-exception handler now logs `traceback.format_exc()` for complete cloud-log diagnostics while preserving the structured 500 response.
+- **Verification:** `python -m pytest tests/` — **34 passed**, with one non-blocking Starlette deprecation warning.

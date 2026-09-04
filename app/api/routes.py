@@ -60,6 +60,10 @@ def get_vision_extractor() -> VisionExtractor:
     return VisionExtractor()
 
 
+def _is_test_mode(value: object) -> bool:
+    return str(value).lower() in ("true", "1", "t")
+
+
 @router.post(
     "/v1/container/lookup",
     response_model=ContainerStatusResponse,
@@ -67,6 +71,7 @@ def get_vision_extractor() -> VisionExtractor:
 async def lookup_container(
     request: LookupRequest,
     _: None = Depends(require_api_key),
+    settings: Settings = Depends(get_settings),
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),
 ) -> ContainerStatusResponse:
@@ -78,6 +83,9 @@ async def lookup_container(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Unsupported terminal code",
         )
+
+    if _is_test_mode(settings.test_mode):
+        return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
 
     screenshot = await browser.capture_portal_state(portal_url, request.container_id)
     page_html = getattr(browser, "last_page_html", None)

@@ -1,5 +1,8 @@
 """FastAPI application entrypoint."""
 
+import logging
+import traceback
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, RedirectResponse
@@ -7,6 +10,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from app.api.routes import router
 from app.models.schemas import ErrorResponse
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PortalConnect API")
 app.add_middleware(
@@ -49,6 +54,7 @@ async def captcha_detected_handler(
 
 @app.exception_handler(Exception)
 async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    logger.error(traceback.format_exc())
     return _error_response(500, "INTERNAL_ERROR", "An unexpected error occurred")
 
 

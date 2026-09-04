@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from types import SimpleNamespace
 
 from app.api.routes import get_browser_service, get_vision_extractor
 from app.core.config import Settings, get_settings
@@ -9,6 +10,11 @@ from app.services.parser import VisionExtractor
 class MockBrowser:
     async def capture_portal_state(self, url, container_id):
         return "offline-screenshot"
+
+
+class BrowserMustNotRun:
+    async def capture_portal_state(self, url, container_id):
+        raise AssertionError("browser must not run in TEST_MODE")
 
 
 def build_mock_client():
@@ -36,6 +42,27 @@ def test_successful_lookup_uses_mock_mode_with_valid_api_key():
         response = client.post(
             "/v1/container/lookup",
             json={"terminal_code": "ny_red_hook", "container_id": "MSCU1234567"},
+        )
+    finally:
+        teardown_overrides()
+
+    assert response.status_code == 200
+    assert response.json() == VisionExtractor.MOCK_RESPONSE
+
+
+def test_la_pier_lookup_short_circuits_browser_in_string_test_mode():
+    app.dependency_overrides[get_settings] = lambda: SimpleNamespace(
+        api_key="integration-key",
+        test_mode="true",
+    )
+    app.dependency_overrides[get_browser_service] = BrowserMustNotRun
+    app.dependency_overrides[get_vision_extractor] = BrowserMustNotRun
+    client = TestClient(app)
+    client.headers.update({"X-API-Key": "integration-key"})
+    try:
+        response = client.post(
+            "/v1/container/lookup",
+            json={"terminal_code": "la_pier_400", "container_id": "MSCU1234567"},
         )
     finally:
         teardown_overrides()

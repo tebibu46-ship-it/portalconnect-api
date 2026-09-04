@@ -68,7 +68,7 @@ def test_captcha_returns_structured_422():
     }
 
 
-def test_unhandled_exception_returns_structured_500():
+def test_unhandled_exception_returns_structured_500_and_logs_traceback(caplog):
     client = request_with_browser(RaisingBrowser(RuntimeError("secret internal detail")))
     try:
         response = client.post(
@@ -84,6 +84,7 @@ def test_unhandled_exception_returns_structured_500():
         "error_code": "INTERNAL_ERROR",
         "message": "An unexpected error occurred",
     }
+    assert "RuntimeError: secret internal detail" in caplog.text
 
 
 def test_cors_middleware_allows_preflight_requests():
