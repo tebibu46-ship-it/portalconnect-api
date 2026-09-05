@@ -40,6 +40,15 @@ class WatchlistService:
                 )
                 """
             )
+            existing = {row[1] for row in connection.execute("PRAGMA table_info(watchlist_containers)")}
+            for name, definition in {
+                "holds": "INTEGER NOT NULL DEFAULT 0",
+                "urgency_level": "TEXT NOT NULL DEFAULT 'UNKNOWN'",
+                "notes": "TEXT NOT NULL DEFAULT ''",
+                "pinned_at": "TEXT NOT NULL DEFAULT ''",
+            }.items():
+                if name not in existing:
+                    connection.execute(f"ALTER TABLE watchlist_containers ADD COLUMN {name} {definition}")
 
     async def upsert(
         self,
@@ -52,16 +61,18 @@ class WatchlistService:
             connection.execute(
                 """
                 INSERT INTO watchlist_containers
-                    (container_id, terminal_id, last_free_day, status, fees_due, last_polled_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (container_id, terminal_id, last_free_day, status, fees_due, last_polled_at, holds, urgency_level, notes, pinned_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(container_id) DO UPDATE SET
                     terminal_id=excluded.terminal_id,
                     last_free_day=excluded.last_free_day,
                     status=excluded.status,
                     fees_due=excluded.fees_due,
-                    last_polled_at=excluded.last_polled_at
+                    last_polled_at=excluded.last_polled_at,
+                    holds=excluded.holds, urgency_level=excluded.urgency_level, notes=excluded.notes
                 """,
-                (container_id.strip().upper(), terminal_id, result.last_free_day, result.status, result.fees_due, polled_at),
+                (container_id.strip().upper(), terminal_id, result.last_free_day, result.status, result.fees_due, polled_at,
+                 int(result.customs_hold), "CRITICAL" if result.fees_due > 0 else "SAFE", result.notes or "", polled_at),
             )
         return {
             "container_id": container_id.strip().upper(),
@@ -70,13 +81,17 @@ class WatchlistService:
             "status": result.status,
             "fees_due": result.fees_due,
             "last_polled_at": polled_at,
+            "holds": int(result.customs_hold),
+            "urgency_level": "CRITICAL" if result.fees_due > 0 else "SAFE",
+            "notes": result.notes or "",
+            "pinned_at": polled_at,
         }
 
     async def list_all(self) -> list[dict[str, Any]]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, container_id, terminal_id, last_free_day, status, fees_due, last_polled_at
+                SELECT id, container_id, terminal_id, last_free_day, status, fees_due, last_polled_at, holds, urgency_level, notes, pinned_at
                 FROM watchlist_containers
                 ORDER BY CASE WHEN last_free_day GLOB '????-??-??' THEN last_free_day ELSE '9999-12-31' END,
                          container_id

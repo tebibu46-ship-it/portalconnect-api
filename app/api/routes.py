@@ -33,6 +33,7 @@ from app.services.scrapers import APMPier400Adapter
 from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.watchlist import WatchlistService
 from app.services.webhook_service import WebhookService
+from app.services.demurrage import calculate_exposure
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -404,6 +405,31 @@ async def delete_watchlist_container(
     return {"deleted": await watchlist.remove(container_id)}
 
 
+@router.post("/api/v1/watchlist/sync")
+async def sync_watchlist(
+    _: None = Depends(require_api_key),
+    settings: Settings = Depends(get_settings),
+    browser: BrowserService = Depends(get_browser_service),
+    extractor: VisionExtractor = Depends(get_vision_extractor),
+    apm_adapter: APMPier400Adapter = Depends(get_apm_adapter),
+    fenix_adapter: FenixPier300Adapter = Depends(get_fenix_adapter),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> dict[str, object]:
+    rows = await watchlist.list_all()
+    limiter = asyncio.Semaphore(5)
+
+    async def refresh(row: dict[str, object]) -> dict[str, object]:
+        async with limiter:
+            result = await _lookup_result(
+                LookupRequest(terminal_code=str(row["terminal_id"]), container_id=str(row["container_id"])),
+                settings, browser, extractor, apm_adapter, fenix_adapter,
+            )
+            return await watchlist.upsert(str(row["container_id"]), str(row["terminal_id"]), result)
+
+    refreshed = await asyncio.gather(*(refresh(row) for row in rows), return_exceptions=True)
+    return {"total": len(rows), "succeeded": sum(not isinstance(item, Exception) for item in refreshed), "results": [item for item in refreshed if not isinstance(item, Exception)]}
+
+
 @router.get("/api/v1/ledger/export", response_class=Response)
 async def export_ledger(
     watchlist: WatchlistService = Depends(get_watchlist_service),
@@ -418,9 +444,10 @@ async def export_ledger(
     writer.writerow(["Container ID", "Terminal", "Status", "Holds", "Fees Due", "Last Free Day", "Urgency Level", "Timestamp"])
     timestamp = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
     for row in rows:
+        urgency = row.get("urgency_level") or ("CRITICAL" if float(row.get("fees_due", 0) or 0) > 0 else _urgency_level(row.get("last_free_day")))
         writer.writerow([
-            row["container_id"], row["terminal_id"], row["status"], "CUSTOMS HOLD" if row.get("customs_hold") else "",
-            row["fees_due"], row["last_free_day"], "CRITICAL" if float(row["fees_due"]) > 0 else "SAFE", timestamp,
+            row["container_id"], row["terminal_id"], row["status"], "CUSTOMS HOLD" if row.get("holds") else "",
+            row["fees_due"], row["last_free_day"], urgency, timestamp,
         ])
     return Response(
         content=output.getvalue(),
