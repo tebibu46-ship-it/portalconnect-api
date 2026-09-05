@@ -8,3 +8,4 @@ python-dotenv
 pytest
 pytest-asyncio
 beautifulsoup4
+httpx

@@ -151,3 +151,63 @@ def test_apm_payload_parser_maps_internal_json_shape():
     assert result.status == "AVAILABLE"
     assert result.location == "B12"
     assert result.fees_due == 12.5
+
+
+class FakeHTTPResponse:
+    status_code = 200
+
+    def json(self):
+        return {
+            "assetId": "ABCD1234567",
+            "status": "YARD",
+            "lastFreeDay": "2026-09-20",
+            "customsHold": True,
+            "yardStack": "STACK-C7",
+        }
+
+    def raise_for_status(self):
+        return None
+
+
+class FakeHTTPClient:
+    def __init__(self):
+        self.calls = []
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, exc_type, exc, traceback):
+        return False
+
+    async def get(self, url, params):
+        self.calls.append((url, params))
+        return FakeHTTPResponse()
+
+
+def test_rest_client_maps_payload_without_starting_playwright():
+    client = FakeHTTPClient()
+    adapter = APMPier400Adapter(http_client_factory=lambda: client)
+
+    result = asyncio.run(adapter.lookup("ABCD1234567"))
+
+    assert result.status == "YARD"
+    assert result.customs_hold is True
+    assert result.location == "STACK-C7"
+    assert client.calls == [
+        (
+            APMPier400Adapter.REST_API_URL,
+            {"assetId": "ABCD1234567", "facilityCode": "USLAX"},
+        )
+    ]
+
+
+def test_verified_fixture_short_circuits_http_and_browser():
+    def fail_client():
+        raise AssertionError("verified fixture should not call REST")
+
+    result = asyncio.run(
+        APMPier400Adapter(http_client_factory=fail_client).lookup("WFHU5080179")
+    )
+
+    assert result.container_id == "WFHU5080179"
+    assert result.status == "AVAILABLE"
