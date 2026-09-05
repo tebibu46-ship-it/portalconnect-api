@@ -39,4 +39,17 @@
   <script>
     const apmSamples=document.querySelectorAll(".sample-chip");if(apmSamples.length>=2){apmSamples[0].dataset.sample="WFHU5080179";apmSamples[0].dataset.terminal="la_pier_400";apmSamples[0].firstChild.nodeValue="WFHU5080179 ";apmSamples[0].lastChild.textContent="(Pier 400)";apmSamples[1].dataset.sample="EGHU9044403";apmSamples[1].dataset.terminal="la_pier_400";apmSamples[1].firstChild.nodeValue="EGHU9044403 ";apmSamples[1].lastChild.textContent="(Pier 400)"}
   </script>
+  <script>
+    document.addEventListener("DOMContentLoaded",()=>{
+      const trackerForm=document.getElementById("lookup-form");
+      if(!trackerForm)return;
+      trackerForm.id="tracker-form";
+      const get=id=>document.getElementById(id),setText=(id,value)=>{const el=get(id);if(el)el.innerText=String(value??"")},toggle=(id,hidden)=>{const el=get(id);if(el)el.classList.toggle("hidden",hidden)};
+      const safeIcons=()=>{try{if(window.lucide){lucide.createIcons()}}catch(e){console.warn("Icon enhancement unavailable",e)}};
+      const safeRender=data=>{setText("result-container",data.container_id);setText("result-terminal",data.terminal_name);setText("result-free-day",data.last_free_day);setText("result-location",data.location);setText("result-customs",data.customs_hold?"Hold active":"Cleared");setText("result-fees",`$${Number(data.fees_due||0).toFixed(2)}`);const badge=get("status-badge"),status=String(data.status||"UNKNOWN").toUpperCase();if(badge){badge.innerText=status;badge.classList.remove("text-[#087345]","text-[#8a6800]","text-[#b83d1d]");badge.classList.add(status.includes("FEES")?"text-[#b83d1d]":status.includes("HOLD")?"text-[#8a6800]":"text-[#087345]")}try{if(typeof updateJourney==="function")updateJourney(status)}catch(e){console.warn("Timeline enhancement unavailable",e)}setText("raw-json",JSON.stringify(data,null,2));toggle("empty-state",true);toggle("loading-state",true);toggle("result-content",false);safeIcons()};
+      const safeLookup=async()=>{const input=get("container-id"),terminal=get("terminal-code"),button=get("submit-button");const containerId=(input?.value||"").trim().toUpperCase(),terminalCode=terminal?.value||"";console.log("Tracking requested:",containerId,terminalCode);toggle("error-banner",true);if(!containerId||!terminalCode){if(input?.reportValidity)input.reportValidity();return}if(button)button.disabled=true;toggle("empty-state",true);toggle("loading-state",false);try{const response=await fetch("/v1/container/lookup",{method:"POST",headers:{"Content-Type":"application/json","X-API-Key":API_KEY},body:JSON.stringify({terminal_code:terminalCode,container_id:containerId})});const data=await response.json();if(!response.ok)throw new Error(data.message||data.detail||"Lookup failed");safeRender(data)}catch(error){console.error("Container tracking failed",error);const banner=get("error-banner");if(banner){banner.innerText=error.message||"Lookup failed. Please try again.";banner.classList.remove("hidden")}toggle("empty-state",false);toggle("loading-state",true)}finally{if(button)button.disabled=false}};
+      trackerForm.addEventListener("submit",event=>{event.preventDefault();event.stopImmediatePropagation();safeLookup()},true);
+      document.querySelectorAll(".sample-chip").forEach(chip=>chip.addEventListener("click",event=>{event.preventDefault();event.stopImmediatePropagation();const input=get("container-id"),terminal=get("terminal-code");if(input)input.value=chip.dataset.sample||"";if(terminal)terminal.value="la_pier_400";safeLookup()},true));
+    });
+  </script>
 </body></html>
