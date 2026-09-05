@@ -27,7 +27,7 @@ class APMPier400Adapter:
         "track-and-trace"
     )
     TERMINAL_NAME = "APM Terminals - Pier 400 (Los Angeles)"
-    HARD_TIMEOUT_SECONDS = 20
+    HARD_TIMEOUT_SECONDS = 15
     INPUT_SELECTOR = (
         "input[name*='container' i], input[id*='container' i], "
         "input[placeholder*='container' i], input[type='text']"
@@ -37,7 +37,12 @@ class APMPier400Adapter:
         "[data-testid*='result' i]"
     )
     BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
-    TRACKER_MARKERS = ("google-analytics.com", "googletagmanager.com", "adobe.io", "omtrdc.net")
+    TRACKER_MARKERS = (
+        "google-analytics.com",
+        "googletagmanager.com",
+        "adobedtm.com",
+        "hotjar.com",
+    )
 
     def __init__(self, playwright_factory: Callable[[], Any] | None = None) -> None:
         self._playwright_factory = playwright_factory or BrowserService._load_playwright
@@ -116,6 +121,59 @@ class APMPier400Adapter:
             ) or "UNKNOWN",
         )
 
+    @classmethod
+    def _parse_payload(
+        cls,
+        payload: Any,
+        requested_container_id: str,
+    ) -> ContainerStatusResponse:
+        """Map common REST/GraphQL telemetry keys without retaining the response."""
+
+        if isinstance(payload, dict):
+            for key in ("data", "result", "container", "containers", "tracking"):
+                if key in payload:
+                    try:
+                        return cls._parse_payload(payload[key], requested_container_id)
+                    except ValueError:
+                        pass
+            values = {
+                re.sub(
+                    r"[^a-z0-9]+",
+                    "_",
+                    re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", str(k)).lower(),
+                ).strip("_"): v
+                for k, v in payload.items()
+            }
+            requested = requested_container_id.strip().upper()
+            container_id = str(values.get("container_id") or values.get("container_number") or requested)
+            status = values.get("status") or values.get("availability_status") or values.get("container_status")
+            if status is None:
+                raise ValueError("APM telemetry is missing availability status")
+            fee_value = values.get("demurrage_fees_due", values.get("fees_due", values.get("fees", 0)))
+            fee_match = re.search(r"-?\d+(?:,\d{3})*(?:\.\d+)?", str(fee_value))
+            customs = str(values.get("customs_hold", values.get("customs", False))).lower()
+            return ContainerStatusResponse(
+                container_id=container_id.upper(),
+                terminal_name=cls.TERMINAL_NAME,
+                status=cls._text(str(status)),
+                fees_due=float(fee_match.group(0).replace(",", "")) if fee_match else 0.0,
+                customs_hold=customs in {"true", "yes", "y", "1", "hold", "held"},
+                last_free_day=str(values.get("last_free_day", values.get("free_day", "UNKNOWN"))),
+                location=str(values.get("yard_stack", values.get("yard_area", values.get("location", "UNKNOWN")))),
+            )
+        if isinstance(payload, list):
+            for item in payload:
+                try:
+                    return cls._parse_payload(item, requested_container_id)
+                except ValueError:
+                    continue
+        raise ValueError("APM telemetry payload has no container status")
+
+    @staticmethod
+    def _looks_like_challenge(value: str) -> bool:
+        lowered = value.lower()
+        return any(marker in lowered for marker in ("captcha", "cloudflare", "verify you are human", "access denied"))
+
     async def lookup(self, container_id: str) -> ContainerStatusResponse:
         """Run one serialized, hard-bounded live lookup against APM."""
 
@@ -126,7 +184,9 @@ class APMPier400Adapter:
                     timeout=self.HARD_TIMEOUT_SECONDS,
                 )
             except asyncio.TimeoutError as exc:
-                raise PortalTimeoutError("APM Pier 400 lookup exceeded 20 seconds") from exc
+                raise PortalTimeoutError(
+                    "Terminal portal took too long to respond. Please try again in a few moments."
+                ) from exc
 
     async def _lookup_unlocked(self, container_id: str) -> ContainerStatusResponse:
         browser = None
@@ -144,14 +204,45 @@ class APMPier400Adapter:
                     )
                     await context.route("**/*", self._route_resource)
                     page = await context.new_page()
-                    await page.goto(self.PORTAL_URL, wait_until="domcontentloaded", timeout=19_000)
+                    response_result: asyncio.Future[ContainerStatusResponse] = asyncio.get_running_loop().create_future()
+
+                    async def inspect_response(response: Any) -> None:
+                        if response.url.startswith("data:"):
+                            return
+                        try:
+                            payload = await response.json()
+                            parsed = self._parse_payload(payload, container_id)
+                        except Exception:
+                            return
+                        if not response_result.done():
+                            response_result.set_result(parsed)
+
+                    def on_response(response: Any) -> None:
+                        asyncio.create_task(inspect_response(response))
+
+                    if hasattr(page, "on"):
+                        page.on("response", on_response)
+                    await page.goto(self.PORTAL_URL, wait_until="domcontentloaded", timeout=8_000)
                     tracking_input = page.locator(self.INPUT_SELECTOR).first
-                    await tracking_input.wait_for(state="visible", timeout=5_000)
+                    if hasattr(page, "wait_for_selector"):
+                        await page.wait_for_selector(
+                            "input[type=\"text\"], input[name*='container' i], [data-testid*='track']",
+                            timeout=10_000,
+                        )
+                    else:
+                        await tracking_input.wait_for(state="visible", timeout=10_000)
                     await tracking_input.fill(container_id, timeout=5_000)
                     await tracking_input.press("Enter")
-                    result = page.locator(self.RESULT_SELECTOR).first
-                    await result.wait_for(state="visible", timeout=8_000)
+                    response_task = response_result
+                    dom_task = asyncio.create_task(page.locator(self.RESULT_SELECTOR).first.wait_for(state="visible", timeout=10_000))
+                    done, pending = await asyncio.wait({response_task, dom_task}, return_when=asyncio.FIRST_COMPLETED)
+                    for task in pending:
+                        task.cancel()
+                    if response_task in done:
+                        return response_task.result()
                     html = await page.content()
+                    if self._looks_like_challenge(html):
+                        raise CaptchaDetectedError("APM portal presented a bot or CAPTCHA challenge")
                     return self.parse_html(html, container_id)
                 except CaptchaDetectedError:
                     raise

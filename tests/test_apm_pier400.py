@@ -129,3 +129,25 @@ def test_apm_lookup_uses_mocked_dom_and_always_cleans_up():
 def test_apm_parser_rejects_missing_status():
     with pytest.raises(ValueError, match="availability status"):
         APMPier400Adapter.parse_html("<table><tr><th>Container ID</th><td>MSKU9018231</td></tr></table>", "MSKU9018231")
+
+
+def test_apm_payload_parser_maps_internal_json_shape():
+    result = APMPier400Adapter._parse_payload(
+        {
+            "data": {
+                "container": {
+                    "containerNumber": "MSKU9018231",
+                    "availabilityStatus": "AVAILABLE",
+                    "yardArea": "B12",
+                    "customsHold": False,
+                    "lastFreeDay": "2026-09-14",
+                    "demurrageFeesDue": 12.5,
+                }
+            }
+        },
+        "MSKU9018231",
+    )
+
+    assert result.status == "AVAILABLE"
+    assert result.location == "B12"
+    assert result.fees_due == 12.5

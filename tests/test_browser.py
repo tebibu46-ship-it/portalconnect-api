@@ -119,9 +119,9 @@ def test_capture_portal_state_configures_browser_and_returns_base64():
 
     assert chromium.launch_args == {
         "headless": True,
-        "args": BrowserService.LOW_MEMORY_ARGS,
+        "args": BrowserService.LAUNCH_ARGS,
     }
-    assert browser.new_context_args["viewport"] == {"width": 1920, "height": 1080}
+    assert browser.new_context_args["viewport"] == {"width": 1280, "height": 800}
     assert browser.new_context_args["user_agent"] == BrowserService.DESKTOP_USER_AGENT
     assert "navigator" in context.init_script and "webdriver" in context.init_script
     assert context.route_args[0] == "**/*"

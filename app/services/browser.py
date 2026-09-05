@@ -25,9 +25,9 @@ class BrowserService:
     DESKTOP_USER_AGENT = (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
         "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/131.0.0.0 Safari/537.36"
+        "Chrome/128.0.0.0 Safari/537.36"
     )
-    VIEWPORT = {"width": 1920, "height": 1080}
+    VIEWPORT = {"width": 1280, "height": 800}
     GENERIC_FORM_SELECTOR = (
         "input[name='container_id'], input[name='container'], "
         "input[id*='container' i], input[id*='tracking' i], "
@@ -48,7 +48,14 @@ class BrowserService:
         "--single-process",
         "--no-zygote",
     ]
+    LAUNCH_ARGS = ["--disable-blink-features=AutomationControlled", *LOW_MEMORY_ARGS]
     BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
+    TRACKER_MARKERS = (
+        "google-analytics.com",
+        "googletagmanager.com",
+        "adobedtm.com",
+        "hotjar.com",
+    )
 
     def __init__(self, playwright_factory: Callable[[], Any] | None = None) -> None:
         self._playwright_factory = playwright_factory or self._load_playwright
@@ -62,7 +69,10 @@ class BrowserService:
 
     @classmethod
     async def _filter_resources(cls, route: Any) -> None:
-        if route.request.resource_type in cls.BLOCKED_RESOURCE_TYPES:
+        request_url = getattr(route.request, "url", "").lower()
+        if route.request.resource_type in cls.BLOCKED_RESOURCE_TYPES or any(
+            marker in request_url for marker in cls.TRACKER_MARKERS
+        ):
             await route.abort()
         else:
             await route.continue_()
@@ -73,7 +83,7 @@ class BrowserService:
         async with self._playwright_factory() as playwright:
             browser = await playwright.chromium.launch(
                 headless=True,
-                args=self.LOW_MEMORY_ARGS,
+                args=self.LAUNCH_ARGS,
             )
             context = None
             try:
