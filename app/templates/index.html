@@ -52,4 +52,12 @@
       document.querySelectorAll(".sample-chip").forEach(chip=>chip.addEventListener("click",event=>{event.preventDefault();event.stopImmediatePropagation();const input=get("container-id"),terminal=get("terminal-code");if(input)input.value=chip.dataset.sample||"";if(terminal)terminal.value="la_pier_400";safeLookup()},true));
     });
   </script>
+  <script>
+    document.addEventListener("DOMContentLoaded",()=>{
+      const empty=document.getElementById("empty-state"),result=document.getElementById("result-content");
+      if(empty&&result){const host=empty.parentElement,standbyView=document.createElement("div"),telemetryView=document.createElement("div");standbyView.id="standby-view";telemetryView.id="telemetry-view";telemetryView.className="hidden";host.insertBefore(standbyView,empty);standbyView.appendChild(empty);host.insertBefore(telemetryView,result);telemetryView.appendChild(result);const syncViews=()=>{if(standbyView&&telemetryView){if(result.classList.contains("hidden")){telemetryView.classList.add("hidden")}else{standbyView.classList.add("hidden");telemetryView.classList.remove("hidden")};if(result.classList.contains("hidden")&&!empty.classList.contains("hidden")){standbyView.classList.remove("hidden")}}};new MutationObserver(syncViews).observe(empty,{attributes:true,attributeFilter:["class"]});new MutationObserver(syncViews).observe(result,{attributes:true,attributeFilter:["class"]});syncViews()}
+      const button=document.getElementById("submit-button");if(button){new MutationObserver(()=>{const label=document.getElementById("button-label");if(label)label.innerText=button.disabled?"Tracking…":"Track container"}).observe(button,{attributes:true,attributeFilter:["disabled"]})}
+      const nativeFetch=window.fetch.bind(window);window.fetch=async(...args)=>{try{const response=await nativeFetch(...args);if(String(args[0]).includes("/v1/container/lookup")){response.clone().json().then(data=>console.log("Telemetry payload received:",data)).catch(()=>{})}return response}catch(error){console.error("Telemetry request failed:",error);throw error}};
+    });
+  </script>
 </body></html>
