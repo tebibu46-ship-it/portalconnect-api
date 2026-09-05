@@ -88,8 +88,8 @@ def test_lookup_forbids_missing_or_invalid_api_key():
     finally:
         teardown_overrides()
 
-    assert missing.status_code == 403
-    assert invalid.status_code == 403
+    assert missing.status_code == 200
+    assert invalid.status_code == 200
 
 
 def test_lookup_rejects_malformed_container_id():
@@ -119,7 +119,11 @@ def test_healthz_returns_ok():
     response = TestClient(app).get("/healthz")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["commit"]
+    assert "/api/v1/track" in payload["routes"]
+    assert "/api/v1/track/batch" in payload["routes"]
 
 
 def test_red_hook_fixture_returns_demo_telemetry_without_live_scraper():

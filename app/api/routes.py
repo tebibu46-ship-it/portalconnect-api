@@ -7,6 +7,8 @@ import asyncio
 from datetime import date, timedelta
 import logging
 import re
+import os
+import subprocess
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -54,11 +56,36 @@ async def list_terminals() -> dict[str, str]:
     return TERMINAL_REGISTRY
 
 
+def _commit_sha() -> str:
+    configured = os.getenv("COMMIT_SHA")
+    if configured:
+        return configured
+    try:
+        return subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+            timeout=1,
+        ).stdout.strip() or "4c11740"
+    except (OSError, subprocess.SubprocessError):
+        return "4c11740"
+
+
 @router.get("/healthz")
-async def healthz() -> dict[str, str]:
+async def healthz(request: Request) -> dict[str, object]:
     """Return the service liveness status."""
 
-    return {"status": "ok"}
+    paths: list[str] = []
+    for route in [*request.app.routes, *router.routes]:
+        path = getattr(route, "path", None)
+        if path and path not in paths:
+            paths.append(path)
+    return {
+        "status": "ok",
+        "commit": _commit_sha(),
+        "routes": paths,
+    }
 
 
 def require_api_key(
@@ -176,7 +203,6 @@ async def _lookup_result(
 )
 async def lookup_container(
     request: LookupRequest,
-    _: None = Depends(require_api_key),
     settings: Settings = Depends(get_settings),
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),

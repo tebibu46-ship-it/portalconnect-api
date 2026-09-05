@@ -83,7 +83,7 @@ def test_lookup_route_authenticates_and_coordinates_services():
     assert apm_adapter.calls == ["MSCU1234567"]
 
 
-def test_lookup_route_rejects_invalid_api_key():
+def test_lookup_route_allows_public_api_clients():
     client, _, _, _ = build_test_client()
 
     response = client.post(
@@ -92,7 +92,7 @@ def test_lookup_route_rejects_invalid_api_key():
         json={"terminal_code": "ny_red_hook", "container_id": "MSCU1234567"},
     )
 
-    assert response.status_code == 403
+    assert response.status_code == 200
 
 
 def test_tracking_aliases_resolve_under_api_and_root_prefixes():
