@@ -1,0 +1,93 @@
+"""Small SQLite persistence service for demurrage watchlist records."""
+
+from __future__ import annotations
+
+import os
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+
+from app.models.schemas import ContainerStatusResponse
+
+
+class WatchlistService:
+    """Persist watchlist rows in a local SQLite database."""
+
+    def __init__(self, db_path: str | Path | None = None) -> None:
+        configured_path = db_path or os.getenv("WATCHLIST_DB_PATH", "data/portalconnect.db")
+        self.db_path = Path(configured_path)
+        self.db_path.parent.mkdir(parents=True, exist_ok=True)
+        self.initialize()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.db_path)
+        connection.row_factory = sqlite3.Row
+        return connection
+
+    def initialize(self) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS watchlist_containers (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    container_id TEXT NOT NULL UNIQUE,
+                    terminal_id TEXT NOT NULL,
+                    last_free_day TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    fees_due REAL NOT NULL,
+                    last_polled_at TEXT NOT NULL
+                )
+                """
+            )
+
+    async def upsert(
+        self,
+        container_id: str,
+        terminal_id: str,
+        result: ContainerStatusResponse,
+    ) -> dict[str, Any]:
+        polled_at = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO watchlist_containers
+                    (container_id, terminal_id, last_free_day, status, fees_due, last_polled_at)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(container_id) DO UPDATE SET
+                    terminal_id=excluded.terminal_id,
+                    last_free_day=excluded.last_free_day,
+                    status=excluded.status,
+                    fees_due=excluded.fees_due,
+                    last_polled_at=excluded.last_polled_at
+                """,
+                (container_id.strip().upper(), terminal_id, result.last_free_day, result.status, result.fees_due, polled_at),
+            )
+        return {
+            "container_id": container_id.strip().upper(),
+            "terminal_id": terminal_id,
+            "last_free_day": result.last_free_day,
+            "status": result.status,
+            "fees_due": result.fees_due,
+            "last_polled_at": polled_at,
+        }
+
+    async def list_all(self) -> list[dict[str, Any]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, container_id, terminal_id, last_free_day, status, fees_due, last_polled_at
+                FROM watchlist_containers
+                ORDER BY CASE WHEN last_free_day GLOB '????-??-??' THEN last_free_day ELSE '9999-12-31' END,
+                         container_id
+                """
+            ).fetchall()
+        return [dict(row) for row in rows]
+
+    async def remove(self, container_id: str) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM watchlist_containers WHERE container_id = ?",
+                (container_id.strip().upper(),),
+            )
+            return cursor.rowcount > 0

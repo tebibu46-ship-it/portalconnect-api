@@ -96,6 +96,12 @@ def test_tracking_dashboard_completes_lookup(local_server: str, capsys: pytest.C
         telemetry_text = telemetry.inner_text()
         assert "WFHU5080179" in telemetry_text
         assert "AVAILABLE" in telemetry_text
+        pin_button = page.locator("#watchlist-pin")
+        expect(pin_button).to_be_visible()
+        pin_button.click()
+        ledger_row = page.locator("#watchlist-body tr", has_text="WFHU5080179")
+        expect(ledger_row).to_be_visible(timeout=5_000)
+        assert "LA_PIER_400" in ledger_row.inner_text()
         assert not console_errors, f"Browser console errors: {console_errors}"
         assert not page_errors, f"Browser uncaught exceptions: {page_errors}"
         browser.close()

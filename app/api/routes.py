@@ -11,11 +11,12 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 from fastapi.responses import JSONResponse
 
 from app.core.config import Settings, get_settings
-from app.models.schemas import ContainerStatusResponse, ErrorResponse, LookupRequest
+from app.models.schemas import ContainerStatusResponse, ErrorResponse, LookupRequest, WatchlistCreateRequest
 from app.services.browser import BrowserService
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError, PortalUnavailableError
 from app.services.parser import VisionExtractor
 from app.services.scrapers import APMPier400Adapter
+from app.services.watchlist import WatchlistService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -80,6 +81,13 @@ def get_apm_adapter() -> APMPier400Adapter:
     return APMPier400Adapter()
 
 
+_watchlist = WatchlistService()
+
+
+def get_watchlist_service() -> WatchlistService:
+    return _watchlist
+
+
 def _is_test_mode(value: object) -> bool:
     return str(value).lower() in ("true", "1", "t")
 
@@ -122,6 +130,28 @@ def _result_response(result: ContainerStatusResponse) -> ContainerStatusResponse
     )
 
 
+async def _lookup_result(
+    request: LookupRequest,
+    settings: Settings,
+    browser: BrowserService,
+    extractor: VisionExtractor,
+    apm_adapter: APMPier400Adapter,
+) -> ContainerStatusResponse:
+    terminal_code = request.terminal_code.lower()
+    portal_url = TERMINAL_REGISTRY.get(terminal_code)
+    if portal_url is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unsupported terminal code")
+    if _is_test_mode(settings.test_mode):
+        return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
+    if terminal_code == "la_pier_400":
+        return await apm_adapter.lookup(request.container_id)
+    if terminal_code == "ny_red_hook":
+        return _red_hook_response(request.container_id)
+    screenshot = await browser.capture_portal_state(portal_url, request.container_id)
+    page_html = getattr(browser, "last_page_html", None)
+    return await extractor.extract(page_html or screenshot, request.terminal_code)
+
+
 @router.post(
     "/v1/container/lookup",
     response_model=ContainerStatusResponse,
@@ -136,26 +166,7 @@ async def lookup_container(
 ) -> ContainerStatusResponse:
     """Capture and parse container status for a registered terminal."""
     try:
-        terminal_code = request.terminal_code.lower()
-        portal_url = TERMINAL_REGISTRY.get(terminal_code)
-        if portal_url is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Unsupported terminal code",
-            )
-
-        if _is_test_mode(settings.test_mode):
-            return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
-
-        if terminal_code == "la_pier_400":
-            return _result_response(await apm_adapter.lookup(request.container_id))
-
-        if terminal_code == "ny_red_hook":
-            return _result_response(_red_hook_response(request.container_id))
-
-        screenshot = await browser.capture_portal_state(portal_url, request.container_id)
-        page_html = getattr(browser, "last_page_html", None)
-        return await extractor.extract(page_html or screenshot, request.terminal_code)
+        return _result_response(await _lookup_result(request, settings, browser, extractor, apm_adapter))
     except (PortalTimeoutError, CaptchaDetectedError, PortalUnavailableError):
         raise
     except HTTPException as exc:
@@ -171,3 +182,42 @@ async def lookup_container(
             message="An unexpected error occurred",
         )
         return JSONResponse(status_code=500, content=payload.model_dump())
+
+
+@router.post("/api/v1/watchlist")
+async def add_watchlist_container(
+    request: WatchlistCreateRequest,
+    _: None = Depends(require_api_key),
+    settings: Settings = Depends(get_settings),
+    browser: BrowserService = Depends(get_browser_service),
+    extractor: VisionExtractor = Depends(get_vision_extractor),
+    apm_adapter: APMPier400Adapter = Depends(get_apm_adapter),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> dict:
+    """Run an immediate lookup and persist its latest demurrage telemetry."""
+
+    result = await _lookup_result(
+        LookupRequest(terminal_code=request.terminal_id, container_id=request.container_id),
+        settings,
+        browser,
+        extractor,
+        apm_adapter,
+    )
+    return await watchlist.upsert(request.container_id, request.terminal_id, result)
+
+
+@router.get("/api/v1/watchlist")
+async def get_watchlist(
+    _: None = Depends(require_api_key),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> list[dict]:
+    return await watchlist.list_all()
+
+
+@router.delete("/api/v1/watchlist/{container_id}")
+async def delete_watchlist_container(
+    container_id: str,
+    _: None = Depends(require_api_key),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> dict[str, bool]:
+    return {"deleted": await watchlist.remove(container_id)}

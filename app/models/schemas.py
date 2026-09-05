@@ -29,6 +29,25 @@ class LookupRequest(BaseModel):
         return normalized
 
 
+class WatchlistCreateRequest(BaseModel):
+    """Input contract for adding a monitored container."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    container_id: str = Field(min_length=11, max_length=11, pattern=r"^[A-Z]{4}[0-9]{7}$")
+    terminal_id: str = Field(min_length=1)
+
+    @field_validator("container_id", "terminal_id", mode="before")
+    @classmethod
+    def normalize_identifier(cls, value: Any) -> str:
+        if not isinstance(value, str):
+            raise ValueError("must be a string")
+        normalized = value.strip().upper()
+        if not normalized:
+            raise ValueError("must not be blank")
+        return normalized
+
+
 class ContainerStatusResponse(BaseModel):
     """Stable response contract for container status lookups."""
 
