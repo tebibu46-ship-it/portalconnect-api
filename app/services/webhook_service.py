@@ -38,6 +38,15 @@ class WebhookService:
             "urgency_level": "CRITICAL" if float(item.get("fees_due", 0) or 0) > 0 else "CAUTION",
         }
 
+    @staticmethod
+    def format_driver_sms(item: dict[str, Any], appointment_url: str) -> str:
+        """Format a concise driver-facing alert for SMS or dispatch gateways."""
+        container = item.get("container_id", "UNKNOWN")
+        terminal = item.get("terminal_name") or item.get("terminal_id", "UNKNOWN")
+        countdown = item.get("countdown") or item.get("urgency_level", "immediate")
+        return (f"[PORTALCONNECT ALERT] CRITICAL: Container {container} at {terminal} free-time "
+                f"expires in {countdown}! Book gate appointment immediately to avoid tiered demurrage: {appointment_url}")
+
     def register(self, target_url: str) -> str:
         target_url = target_url.strip()
         if not target_url.startswith(("http://", "https://")):

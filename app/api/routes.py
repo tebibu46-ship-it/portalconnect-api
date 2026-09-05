@@ -14,7 +14,7 @@ import subprocess
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, Response
 
 from app.core.config import Settings, get_settings
 from app.models.schemas import (
@@ -34,7 +34,7 @@ from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.watchlist import WatchlistService
 from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
-from app.services.dispute import build_dossier
+from app.services.dispute import build_dossier, render_printable_dossier
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -481,6 +481,31 @@ async def dispute_dossier(
     return build_dossier(normalized, row)
 
 
+@router.get("/api/v1/dispute/{container_id}/export", response_class=HTMLResponse)
+async def export_dispute_dossier(
+    container_id: str,
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> HTMLResponse:
+    """Return a print-ready dispute packet; browsers can save it directly as PDF."""
+    normalized = container_id.strip().upper()
+    row = next((item for item in await watchlist.list_all() if item["container_id"] == normalized), None)
+    dossier = build_dossier(normalized, row)
+    return HTMLResponse(
+        render_printable_dossier(dossier),
+        headers={"Content-Disposition": f'inline; filename="dispute_dossier_{normalized}.html"'},
+    )
+
+
+@router.get("/api/v1/vessels")
+async def inbound_vessel_telemetry() -> list[dict[str, str]]:
+    """Expose the current deterministic inbound-vessel planning snapshot."""
+    return [
+        {"terminal_id": "la_pier_400", "vessel_name": "CMA CGM MARCO POLO", "berthing_eta": "2026-09-06T14:00:00Z", "predictive_lfd_window": "2026-09-06 → 2026-09-08", "congestion_index": "Moderate"},
+        {"terminal_id": "fenix_pier_300", "vessel_name": "MSC ANNA", "berthing_eta": "2026-09-07T08:30:00Z", "predictive_lfd_window": "2026-09-08 → 2026-09-10", "congestion_index": "Normal"},
+        {"terminal_id": "ny_red_hook", "vessel_name": "CMA CGM BELLINI", "berthing_eta": "2026-09-06T20:00:00Z", "predictive_lfd_window": "2026-09-08 → 2026-09-10", "congestion_index": "Normal"},
+    ]
+
+
 @router.get("/api/v1/ledger/export", response_class=Response)
 async def export_ledger(
     watchlist: WatchlistService = Depends(get_watchlist_service),
@@ -535,4 +560,27 @@ async def test_webhook(
     payload = webhook.build_alert(item)
     if payload is None:
         return {"delivered": False, "payload": None, "reason": "No urgent condition detected"}
+    return await webhook.dispatch(payload, request.target_url)
+
+
+@router.post("/api/v1/webhooks/driver-sms")
+async def dispatch_driver_sms(
+    request: WebhookTestRequest,
+    webhook: WebhookService = Depends(get_webhook_service),
+) -> dict[str, object]:
+    """Send a driver-ready SMS payload through the configured webhook gateway."""
+    terminal = request.terminal_id or "la_pier_400"
+    item = request.item or {"container_id": request.container_id or "DEMO1234567", "terminal_id": terminal,
+                            "status": "CRITICAL", "fees_due": max(request.fees_due, 1.0),
+                            "last_free_day": request.last_free_day or date.today().isoformat(),
+                            "urgency_level": "CRITICAL"}
+    terminal_key = str(terminal).lower()
+    if "fenix" in terminal_key:
+        appointment_url = APPOINTMENT_PORTALS["fenix_pier_300"]
+    elif "red" in terminal_key or "hook" in terminal_key:
+        appointment_url = APPOINTMENT_PORTALS["ny_red_hook"]
+    else:
+        appointment_url = APPOINTMENT_PORTALS.get(terminal_key, APPOINTMENT_PORTALS["la_pier_400"])
+    sms = webhook.format_driver_sms(item, appointment_url)
+    payload = {"event": "driver_sms_alert", "message": sms, "container_id": item.get("container_id"), "appointment_url": appointment_url}
     return await webhook.dispatch(payload, request.target_url)

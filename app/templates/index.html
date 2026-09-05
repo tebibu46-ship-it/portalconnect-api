@@ -34,6 +34,7 @@
 </section>
 <section id="desk" class="desk inset">
  <header class="section-head"><div><p class="eyebrow">03 / OPERATIONS DESK</p><h2>Dispatch console.</h2></div><p class="mono">PORT ARRIVAL → GATE RELEASE</p></header>
+ <div id="vessel-telemetry" class="vessel-telemetry" aria-live="polite"><p class="eyebrow">INBOUND VESSEL TRACKER</p><strong id="vessel-name">Loading inbound schedule…</strong><span id="vessel-eta" class="mono"></span><span id="vessel-congestion"></span></div>
  <div class="cockpit">
  <div id="lookup-form" class="query-panel">
   <div class="panel-heading"><span>QUERY TERMINAL</span><span>ISO / 6346</span></div>
@@ -138,6 +139,15 @@ document.addEventListener("DOMContentLoaded",()=>{
  const dropzone=document.getElementById("manifest-dropzone");dropzone?.addEventListener("dragover",event=>{event.preventDefault();dropzone.classList.add("dragging")});dropzone?.addEventListener("dragleave",()=>dropzone.classList.remove("dragging"));dropzone?.addEventListener("drop",event=>{event.preventDefault();dropzone.classList.remove("dragging");const item=event.dataTransfer?.files?.[0];if(item&&/\.(csv|txt)$/i.test(item.name)){const reader=new FileReader();reader.onload=()=>{if(text)text.value=String(reader.result||"");button?.click()};reader.readAsText(item)}});dropzone?.addEventListener("keydown",event=>{if(event.key==="Enter"||event.key===" ")document.getElementById("batch-file")?.click()});
  document.getElementById("batch-watchlist-btn")?.addEventListener("click",async()=>{const results=window.batchResults||[],terminal=document.getElementById("terminal_select")?.value||"la_pier_400";await Promise.all(results.map(row=>fetch("/api/v1/watchlist",{method:"POST",headers:{"Content-Type":"application/json","X-API-Key":"test_secret_key"},body:JSON.stringify({container_id:row.container_id,terminal_id:terminal})})));show("Batch units added to watchlist")});
  const fleet=async()=>{try{const rows=await fetch("/api/v1/watchlist",{headers:{"X-API-Key":"test_secret_key"}}).then(response=>response.json());const active=rows.reduce((sum,row)=>sum+Number(row.fees_due||0),0),disputed=rows.filter(row=>Number(row.fees_due||0)>0).reduce((sum,row)=>sum+Number(row.fees_due||0),0),cleared=rows.filter(row=>String(row.status||"").toUpperCase()==="AVAILABLE").length,holds=rows.filter(row=>row.holds).length,pending=rows.filter(row=>String(row.status||"").includes("PENDING")).length;document.getElementById("fleet-active").textContent=`$${active.toLocaleString()} ACTIVE`;document.getElementById("fleet-disputed").textContent=`$${disputed.toLocaleString()} DISPUTED`;document.getElementById("fleet-cleared").textContent=`${cleared} CLEARED`;document.getElementById("fleet-holds").textContent=`${holds} HOLDS · ${pending} PENDING RELEASE`}catch(error){console.warn("Fleet metrics unavailable",error)}};fleet();
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  fetch("/api/v1/vessels").then(response=>response.json()).then(vessels=>{const selected=vessels.find(item=>item.terminal_id==="la_pier_400")||vessels[0];if(!selected)return;document.getElementById("vessel-name").textContent=selected.vessel_name;document.getElementById("vessel-eta").textContent=`ETA ${selected.berthing_eta} · LFD WINDOW ${selected.predictive_lfd_window}`;document.getElementById("vessel-congestion").textContent=`CONGESTION / ${selected.congestion_index}`}).catch(()=>{});
+  const body=document.getElementById("watchlist-body");
+  const addDriverActions=()=>body?.querySelectorAll("tr").forEach(row=>{const actions=row.querySelector("td:last-child"),code=row.querySelector(".ledger-code")?.textContent.trim(),terminal=row.querySelector(".ledger-terminal")?.textContent.trim();if(actions&&code&&!actions.querySelector("[data-driver-sms]")){const button=document.createElement("button");button.className="ledger-action";button.textContent="Dispatch Driver 📱";button.dataset.driverSms=code;button.dataset.terminal=terminal||"la_pier_400";actions.appendChild(button)}});
+  body&&new MutationObserver(addDriverActions).observe(body,{childList:true,subtree:true});addDriverActions();
+  body?.addEventListener("click",async event=>{const button=event.target.closest("[data-driver-sms]");if(!button)return;button.disabled=true;try{const response=await fetch("/api/v1/webhooks/driver-sms",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({container_id:button.dataset.driverSms,terminal_id:button.dataset.terminal,fees_due:1})});const data=await response.json();if(!response.ok)throw Error(data.detail||"Driver dispatch failed");button.textContent="Driver alerted"}catch(error){button.textContent="Dispatch failed"}finally{button.disabled=false}});
 });
 </script>
 </body>

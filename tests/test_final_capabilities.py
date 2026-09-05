@@ -209,6 +209,44 @@ def test_dispute_endpoint_returns_audit_grade_payload():
     assert "OSRA-22" in payload["statement"]
 
 
+def test_dispute_export_is_print_ready_html():
+    class EmptyWatchlist:
+        async def list_all(self):
+            return []
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_watchlist_service] = EmptyWatchlist
+    try:
+        response = TestClient(app).get("/api/v1/dispute/WFHU5080179/export")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/html")
+    assert "OFFICIAL FMC OSRA-22 CONTESTED CHARGE" in response.text
+    assert "Verification ID" in response.text
+
+
+def test_driver_sms_formatter_contains_appointment_instruction():
+    message = WebhookService.format_driver_sms(
+        {"container_id": "CMAU4928104", "terminal_name": "Red Hook", "countdown": "6h"},
+        "https://bpt.bavariaportal.com/",
+    )
+    assert message.startswith("[PORTALCONNECT ALERT] CRITICAL:")
+    assert "CMAU4928104" in message
+    assert "https://bpt.bavariaportal.com/" in message
+
+
+def test_inbound_vessel_telemetry_endpoint_has_predictive_fields():
+    app = FastAPI()
+    app.include_router(router)
+    response = TestClient(app).get("/api/v1/vessels")
+    assert response.status_code == 200
+    assert response.json()[0]["vessel_name"] == "CMA CGM MARCO POLO"
+    assert response.json()[0]["congestion_index"] == "Moderate"
+
+
 def test_manual_alert_poll_is_public_and_returns_audit_shape():
     class EmptyWatchlist:
         async def list_all(self):
