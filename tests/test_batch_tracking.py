@@ -46,6 +46,16 @@ def test_batch_json_resolves_multiple_containers():
     assert payload["results"][1]["status"] == "LOOKUP_FAILED"
 
 
+def test_batch_json_allows_unauthenticated_post():
+    response = client().post(
+        "/api/v1/track/batch",
+        json={"containers": ["WFHU5080179"], "terminal": "la_pier_400"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["container_id"] == "WFHU5080179"
+
+
 def test_batch_manifest_parses_messy_csv_whitespace():
     response = client().post(
         "/api/v1/track/batch",

@@ -262,7 +262,6 @@ async def _parse_batch_input(request: Request) -> BatchTrackRequest:
 @router.post("/api/v1/track/batch")
 async def batch_track(
     request: Request,
-    _: None = Depends(require_api_key),
     settings: Settings = Depends(get_settings),
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),
