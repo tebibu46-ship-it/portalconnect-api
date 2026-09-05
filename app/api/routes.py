@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import secrets
 import asyncio
+import csv
+import io
 from datetime import date, timedelta
 import logging
 import re
@@ -12,7 +14,7 @@ import subprocess
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 
 from app.core.config import Settings, get_settings
 from app.models.schemas import (
@@ -22,20 +24,24 @@ from app.models.schemas import (
     ErrorResponse,
     LookupRequest,
     WatchlistCreateRequest,
+    WebhookTestRequest,
 )
 from app.services.browser import BrowserService
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError, PortalUnavailableError
 from app.services.parser import VisionExtractor
 from app.services.scrapers import APMPier400Adapter
+from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.watchlist import WatchlistService
+from app.services.webhook_service import WebhookService
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 TERMINAL_REGISTRY = {
-    "la_pier_400": APMPier400Adapter.PORTAL_URL,
-    "apm_pier_400": APMPier400Adapter.PORTAL_URL,
-    "ny_red_hook": "https://portal.example.com/ny-red-hook",
+    "la_pier_400": {"name": "APM Terminals - Pier 400 (Los Angeles)", "url": APMPier400Adapter.PORTAL_URL, "status": "ACTIVE"},
+    "apm_pier_400": {"name": "APM Terminals - Pier 400 (Los Angeles)", "url": APMPier400Adapter.PORTAL_URL, "status": "ACTIVE"},
+    "fenix_pier_300": {"name": "Fenix Marine Services - Pier 300 (Los Angeles)", "url": "https://www.fenixmarineservices.com/", "status": "ACTIVE"},
+    "ny_red_hook": {"name": "Red Hook Container Terminal (New York)", "url": "https://portal.example.com/ny-red-hook", "status": "PREVIEW"},
 }
 RED_HOOK_FIXTURES = {
     "CMAU4928100",
@@ -51,7 +57,7 @@ ISO_CONTAINER_PATTERN = re.compile(r"^[A-Z]{4}[0-9]{7}$")
 
 
 @router.get("/v1/terminals")
-async def list_terminals() -> dict[str, str]:
+async def list_terminals() -> dict[str, dict[str, str]]:
     """Return the supported terminal registry."""
 
     return TERMINAL_REGISTRY
@@ -119,11 +125,20 @@ def get_apm_adapter() -> APMPier400Adapter:
     return APMPier400Adapter()
 
 
+def get_fenix_adapter() -> FenixPier300Adapter:
+    return FenixPier300Adapter()
+
+
 _watchlist = WatchlistService()
+_webhooks = WebhookService()
 
 
 def get_watchlist_service() -> WatchlistService:
     return _watchlist
+
+
+def get_webhook_service() -> WebhookService:
+    return _webhooks
 
 
 def _is_test_mode(value: object) -> bool:
@@ -174,15 +189,19 @@ async def _lookup_result(
     browser: BrowserService,
     extractor: VisionExtractor,
     apm_adapter: APMPier400Adapter,
+    fenix_adapter: FenixPier300Adapter | None = None,
 ) -> ContainerStatusResponse:
     terminal_code = request.terminal_code.lower()
-    portal_url = TERMINAL_REGISTRY.get(terminal_code)
-    if portal_url is None:
+    terminal = TERMINAL_REGISTRY.get(terminal_code)
+    if terminal is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unsupported terminal code")
+    portal_url = terminal["url"]
     if _is_test_mode(settings.test_mode):
         return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
     if terminal_code in {"la_pier_400", "apm_pier_400"}:
         return await apm_adapter.lookup(request.container_id)
+    if terminal_code == "fenix_pier_300":
+        return await (fenix_adapter or FenixPier300Adapter()).lookup(request.container_id)
     if terminal_code == "ny_red_hook":
         return _red_hook_response(request.container_id)
     screenshot = await browser.capture_portal_state(portal_url, request.container_id)
@@ -208,10 +227,11 @@ async def lookup_container(
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),
     apm_adapter: APMPier400Adapter = Depends(get_apm_adapter),
+    fenix_adapter: FenixPier300Adapter = Depends(get_fenix_adapter),
 ) -> ContainerStatusResponse:
     """Capture and parse container status for a registered terminal."""
     try:
-        return _result_response(await _lookup_result(request, settings, browser, extractor, apm_adapter))
+        return _result_response(await _lookup_result(request, settings, browser, extractor, apm_adapter, fenix_adapter))
     except (PortalTimeoutError, CaptchaDetectedError, PortalUnavailableError):
         raise
     except HTTPException as exc:
@@ -302,6 +322,7 @@ async def batch_track(
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),
     apm_adapter: APMPier400Adapter = Depends(get_apm_adapter),
+    fenix_adapter: FenixPier300Adapter = Depends(get_fenix_adapter),
 ) -> dict[str, object]:
     """Resolve a manifest with at most five terminal lookups in flight."""
 
@@ -323,6 +344,7 @@ async def batch_track(
                     browser,
                     extractor,
                     apm_adapter,
+                    fenix_adapter,
                 )
                 return _batch_result(container_id, result)
             except Exception as exc:
@@ -375,3 +397,55 @@ async def delete_watchlist_container(
     watchlist: WatchlistService = Depends(get_watchlist_service),
 ) -> dict[str, bool]:
     return {"deleted": await watchlist.remove(container_id)}
+
+
+@router.get("/api/v1/ledger/export", response_class=Response)
+async def export_ledger(
+    _: None = Depends(require_api_key),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> Response:
+    """Export the persisted risk ledger as RFC-4180 CSV."""
+
+    rows = await watchlist.list_all()
+    output = io.StringIO(newline="")
+    writer = csv.writer(output, lineterminator="\r\n")
+    writer.writerow(["Container ID", "Terminal", "Status", "Holds", "Fees Due", "Last Free Day", "Urgency Level", "Timestamp"])
+    timestamp = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+    for row in rows:
+        writer.writerow([
+            row["container_id"], row["terminal_id"], row["status"], "CUSTOMS HOLD" if row.get("customs_hold") else "",
+            row["fees_due"], row["last_free_day"], "CRITICAL" if float(row["fees_due"]) > 0 else "SAFE", timestamp,
+        ])
+    return Response(
+        content=output.getvalue(),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=demurrage_ledger_export.csv"},
+    )
+
+
+@router.post("/api/v1/webhooks/register")
+async def register_webhook(
+    request: WebhookTestRequest,
+    webhook: WebhookService = Depends(get_webhook_service),
+) -> dict[str, str]:
+    if not request.target_url:
+        raise HTTPException(status_code=422, detail="target_url is required")
+    try:
+        return {"target_url": webhook.register(request.target_url)}
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.post("/api/v1/webhooks/test")
+async def test_webhook(
+    request: WebhookTestRequest,
+    webhook: WebhookService = Depends(get_webhook_service),
+) -> dict[str, object]:
+    item = request.item or {
+        "container_id": "DEMO1234567", "terminal_id": "la_pier_400", "status": "HOLD",
+        "fees_due": 25.0, "last_free_day": date.today().isoformat(),
+    }
+    payload = webhook.build_alert(item)
+    if payload is None:
+        return {"delivered": False, "payload": None, "reason": "No urgent condition detected"}
+    return await webhook.dispatch(payload, request.target_url)

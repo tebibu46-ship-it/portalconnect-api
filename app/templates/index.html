@@ -38,19 +38,11 @@
  <div id="lookup-form" class="query-panel">
   <div class="panel-heading"><span>QUERY TERMINAL</span><span>ISO / 6346</span></div>
   <div class="dispatch-mode" role="tablist" aria-label="Tracking mode"><button type="button" class="mode-tab active" data-mode="single" aria-selected="true">SINGLE UNIT</button><button type="button" class="mode-tab" data-mode="batch" aria-selected="false">MANIFEST BATCH INGEST</button></div>
-  <div class="dispatch-mode" role="tablist" aria-label="Tracking mode"><button type="button" class="mode-tab active" data-mode="single" aria-selected="true">SINGLE UNIT</button><button type="button" class="mode-tab" data-mode="batch" aria-selected="false">MANIFEST BATCH INGEST</button></div>
   <form id="tracker-form">
-   <label for="terminal_select">Terminal port</label><select id="terminal_select" name="terminal_code" required><option value="la_pier_400">APM Pier 400 · Los Angeles</option><option value="ny_red_hook">Red Hook · New York</option><option disabled>Fenix Pier 300 · Coming soon</option></select>
+   <label for="terminal_select">Terminal port</label><select id="terminal_select" name="terminal_code" required><option value="apm_pier_400">APM Terminals - Pier 400 (Los Angeles)</option><option value="fenix_pier_300">Fenix Marine Services - Pier 300 (Los Angeles)</option><option value="ny_red_hook">Red Hook · New York</option></select>
    <label for="container_id">Container number</label><input id="container_id" name="container_id" placeholder="WFHU5080179" pattern="[A-Za-z]{4}[0-9]{7}" minlength="11" maxlength="11" required autocomplete="off" aria-describedby="input-hint"><p id="input-hint">4 letters + 7 digits. Example: WFHU5080179</p>
    <button id="track-btn" class="action" type="submit"><span id="track-loader" class="loader hidden" aria-hidden="true"></span><span id="track-label">DISPATCH TELEMETRY</span><span>↗</span></button>
   </form>
-  <div id="batch-panel" class="batch-panel hidden">
-   <label for="batch-containers">Manifest container IDs</label>
-   <textarea id="batch-containers" rows="6" placeholder="WFHU5080179&#10;MSKU9018201&#10;CMAU4928104" spellcheck="false"></textarea>
-   <label class="file-drop" for="batch-file">Or choose a .csv / .txt manifest<input id="batch-file" type="file" accept=".csv,.txt,text/csv,text/plain"></label>
-   <div class="batch-progress hidden" id="batch-progress" aria-live="polite"><span id="batch-progress-bar"></span><small id="batch-progress-label">Preparing manifest…</small></div>
-   <button id="batch-track-btn" class="action" type="button">EXECUTE BATCH TELEMETRY <span>↗</span></button>
-  </div>
   <div id="batch-panel" class="batch-panel hidden">
    <label for="batch-containers">Manifest container IDs</label>
    <textarea id="batch-containers" rows="6" placeholder="WFHU5080179&#10;MSKU9018201&#10;CMAU4928104" spellcheck="false"></textarea>
@@ -74,7 +66,7 @@
  </div>
 </section>
 <section id="watchlist-ledger" class="ledger inset" aria-live="polite">
- <header class="section-head"><div><p class="eyebrow">04 / WATCHLIST</p><h2>Demurrage risk ledger.</h2></div><span class="mono">SORTED BY CLOSEST FREE DAY</span></header>
+ <header class="section-head"><div><p class="eyebrow">04 / WATCHLIST</p><h2>Demurrage risk ledger.</h2></div><div><button id="export-ledger-btn" class="ledger-action" type="button">EXPORT MANIFEST CSV</button><span class="mono">SORTED BY CLOSEST FREE DAY</span></div></header>
  <div class="ledger-scroll"><table><thead><tr><th>Container / terminal</th><th>Status</th><th>Last free day</th><th>Countdown</th><th>Actions</th></tr></thead><tbody id="watchlist-body"><tr><td colspan="5">Loading watchlist…</td></tr></tbody></table></div>
 </section>
 <section class="pillars inset" aria-label="Capabilities"><article id="air"><span class="mono">01 / CAPABILITY</span><h3>Air freight</h3><p>Connected routes. Shared visibility.</p><a href="#desk" aria-label="Explore Air freight">↗</a></article><article id="ocean"><span class="mono">02 / CAPABILITY</span><h3>Ocean intermodal</h3><p>From terminal arrival to gate release.</p><a href="#desk" aria-label="Explore Ocean intermodal">↗</a></article><article id="customs"><span class="mono">03 / CAPABILITY</span><h3>Customs brokerage</h3><p>Clearance signals at a glance.</p><a href="#desk" aria-label="Explore Customs brokerage">↗</a></article><article id="risk"><span class="mono">04 / CAPABILITY</span><h3>Demurrage escalation</h3><p>Time-sensitive units, brought forward.</p><a href="#watchlist-ledger" aria-label="Explore Demurrage escalation">↗</a></article></section>
@@ -83,6 +75,13 @@
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <div id="scroll-progress" aria-hidden="true"></div>
 <script src="/static/dispatch.js" defer></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+ const exportButton=document.getElementById("export-ledger-btn");
+ exportButton?.addEventListener("click",()=>{const rows=[...[document.querySelectorAll("#watchlist-ledger table tr")]];const csv=rows.map(row=>[...row.querySelectorAll("th,td")].map(cell=>`"${cell.textContent.trim().replace(/"/g,'""')}"`).join(",")).join("\r\n");const blob=new Blob([csv],{type:"text/csv;charset=utf-8"}),link=document.createElement("a"),stamp=new Date().toISOString().replace(/[:.]/g,"-");link.href=URL.createObjectURL(blob);link.download=`demurrage_ledger_export_${stamp}.csv`;link.click();URL.revokeObjectURL(link.href)});
+ fetch("/v1/terminals").then(response=>response.json()).then(terminals=>Object.entries(terminals).forEach(([code,terminal])=>{const option=document.querySelector(`#terminal_select option[value="${code}"]`);if(option&&typeof terminal==="object")option.textContent=terminal.name||code})).catch(()=>{});
+});
+</script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
   const videos=[...document.querySelectorAll(".hero-bg video,.horizon-bg video,.standby-bg video")];

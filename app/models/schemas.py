@@ -125,6 +125,15 @@ class ErrorResponse(BaseModel):
     message: str
 
 
+class WebhookTestRequest(BaseModel):
+    """Optional target and watchlist item used by webhook test-fire calls."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    target_url: str | None = None
+    item: dict[str, Any] | None = None
+
+
 class BatchContainerResult(BaseModel):
     """One resilient result in a batch manifest."""
 

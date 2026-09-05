@@ -123,10 +123,13 @@ def test_terminals_returns_supported_registry():
     response = TestClient(app).get("/v1/terminals")
 
     assert response.status_code == 200
-    assert response.json() == {
-        "la_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
-        "apm_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
-        "ny_red_hook": "https://portal.example.com/ny-red-hook",
+    payload = response.json()
+    assert payload["la_pier_400"]["status"] == "ACTIVE"
+    assert payload["apm_pier_400"]["name"] == "APM Terminals - Pier 400 (Los Angeles)"
+    assert payload["fenix_pier_300"] == {
+        "name": "Fenix Marine Services - Pier 300 (Los Angeles)",
+        "url": "https://www.fenixmarineservices.com/",
+        "status": "ACTIVE",
     }
 
 
