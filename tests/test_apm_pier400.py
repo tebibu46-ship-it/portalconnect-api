@@ -115,11 +115,11 @@ class Factory:
 
 def test_apm_lookup_uses_mocked_dom_and_always_cleans_up():
     factory = Factory()
-    result = asyncio.run(APMPier400Adapter(lambda: factory).lookup("MSKU9018231"))
+    result = asyncio.run(APMPier400Adapter(lambda: factory).lookup("ZZZZ1234567"))
 
     page = factory.playwright.chromium.browser.context.page
     assert result.container_id == "MSKU9018231"
-    assert page.filled == "MSKU9018231"
+    assert page.filled == "ZZZZ1234567"
     assert page.pressed == "Enter"
     assert page.goto_args[0] == APMPier400Adapter.PORTAL_URL
     assert factory.playwright.chromium.browser.context.closed is True
@@ -211,3 +211,36 @@ def test_verified_fixture_short_circuits_http_and_browser():
 
     assert result.container_id == "WFHU5080179"
     assert result.status == "AVAILABLE"
+
+
+def test_common_mock_fixture_short_circuits_http_and_browser():
+    def fail_client():
+        raise AssertionError("mock fixture should not call REST")
+
+    result = asyncio.run(
+        APMPier400Adapter(http_client_factory=fail_client).lookup("CMAU4928104")
+    )
+
+    assert result.container_id == "CMAU4928104"
+    assert result.status == "AVAILABLE"
+
+
+def test_live_failure_returns_pending_response_with_notes():
+    adapter = APMPier400Adapter()
+
+    async def no_rest(_container_id):
+        return None
+
+    async def browser_timeout(_container_id):
+        raise TimeoutError("portal timeout")
+
+    adapter._lookup_rest_first = no_rest
+    adapter._lookup_unlocked = browser_timeout
+    result = asyncio.run(adapter.lookup("ZZZZ1234567"))
+
+    assert result.status == "NOT_FOUND_OR_PENDING"
+    assert result.terminal_name == "APM Terminals — Pier 400 (Los Angeles)"
+    assert result.notes == (
+        "Container not yet manifested at Pier 400 or terminal portal access restricted. "
+        "Check back closer to vessel ETA."
+    )

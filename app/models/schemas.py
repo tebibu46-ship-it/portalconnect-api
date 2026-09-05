@@ -41,6 +41,7 @@ class ContainerStatusResponse(BaseModel):
     customs_hold: bool
     last_free_day: str
     location: str
+    notes: str | None = Field(default=None, exclude=True)
 
 
 class ErrorResponse(BaseModel):

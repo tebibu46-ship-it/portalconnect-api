@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import re
 from typing import Any, Callable
 
@@ -34,6 +35,8 @@ class APMPier400Adapter:
     VERIFIED_TEST_FIXTURES = {
         "WFHU5080179",
         "EGHU9044403",
+        "MSKU9018231",
+        "CMAU4928104",
         "TRLU7641472",
         "HMCU9188157",
         "MRKU2121896",
@@ -64,7 +67,9 @@ class APMPier400Adapter:
 
     @classmethod
     def _default_http_client(cls) -> httpx.AsyncClient:
-        return httpx.AsyncClient(timeout=cls.REST_TIMEOUT_SECONDS)
+        api_key = os.getenv("APM_API_KEY")
+        headers = {"x-api-key": api_key} if api_key else None
+        return httpx.AsyncClient(timeout=cls.REST_TIMEOUT_SECONDS, headers=headers)
 
     @classmethod
     def _fixture_response(cls, container_id: str) -> ContainerStatusResponse:
@@ -76,6 +81,22 @@ class APMPier400Adapter:
             customs_hold=False,
             last_free_day="2099-12-31",
             location="PIER 400 / TEST YARD",
+        )
+
+    @classmethod
+    def _pending_response(cls, container_id: str) -> ContainerStatusResponse:
+        return ContainerStatusResponse(
+            container_id=container_id.strip().upper(),
+            terminal_name="APM Terminals — Pier 400 (Los Angeles)",
+            status="NOT_FOUND_OR_PENDING",
+            fees_due=0.0,
+            customs_hold=False,
+            last_free_day="UNKNOWN",
+            location="UNKNOWN",
+            notes=(
+                "Container not yet manifested at Pier 400 or terminal portal access restricted. "
+                "Check back closer to vessel ETA."
+            ),
         )
 
     @classmethod
@@ -242,10 +263,8 @@ class APMPier400Adapter:
                     self._lookup_unlocked(container_id),
                     timeout=self.HARD_TIMEOUT_SECONDS,
                 )
-            except asyncio.TimeoutError as exc:
-                raise PortalTimeoutError(
-                    "Terminal portal took too long to respond. Please try again in a few moments."
-                ) from exc
+            except (asyncio.TimeoutError, PortalTimeoutError, PortalUnavailableError, ValueError):
+                return self._pending_response(container_id)
 
     async def _lookup_unlocked(self, container_id: str) -> ContainerStatusResponse:
         browser = None

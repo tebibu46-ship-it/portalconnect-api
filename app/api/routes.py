@@ -6,6 +6,7 @@ import secrets
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from app.core.config import Settings, get_settings
 from app.models.schemas import ContainerStatusResponse, LookupRequest
@@ -94,7 +95,14 @@ async def lookup_container(
         return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
 
     if request.terminal_code.lower() == "la_pier_400":
-        return await apm_adapter.lookup(request.container_id)
+        result = await apm_adapter.lookup(request.container_id)
+        notes = getattr(result, "notes", None)
+        if notes:
+            return JSONResponse(
+                status_code=200,
+                content={**result.model_dump(), "notes": notes},
+            )
+        return result
 
     screenshot = await browser.capture_portal_state(portal_url, request.container_id)
     page_html = getattr(browser, "last_page_html", None)
