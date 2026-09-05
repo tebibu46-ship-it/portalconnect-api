@@ -7,6 +7,7 @@ import traceback
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
 from app.models.schemas import ErrorResponse
@@ -15,6 +16,7 @@ from app.services.browser import CaptchaDetectedError, PortalTimeoutError, Porta
 logger = logging.getLogger(__name__)
 
 app = FastAPI(title="PortalConnect API")
+app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
