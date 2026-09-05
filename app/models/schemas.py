@@ -154,6 +154,36 @@ class WebhookTestRequest(BaseModel):
         return payload
 
 
+class DriverSmsRequest(BaseModel):
+    """Public driver dispatch contract with friendly field aliases."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    container_id: str = Field(min_length=1)
+    phone_number: str = "+12135550199"
+    driver_name: str = "Fleet Driver"
+    terminal_id: str = "la_pier_400"
+    target_url: str | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_driver_aliases(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "phone_number" not in payload and "phone" in payload:
+            payload["phone_number"] = payload["phone"]
+        payload.pop("phone", None)
+        return payload
+
+    @field_validator("container_id", "phone_number", "driver_name", "terminal_id", mode="before")
+    @classmethod
+    def normalize_text(cls, value: Any) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("must be a non-empty string")
+        return value.strip()
+
+
 class BatchContainerResult(BaseModel):
     """One resilient result in a batch manifest."""
 

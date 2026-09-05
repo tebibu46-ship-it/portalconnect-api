@@ -21,6 +21,7 @@ from app.models.schemas import (
     BatchContainerResult,
     BatchTrackRequest,
     ContainerStatusResponse,
+    DriverSmsRequest,
     ErrorResponse,
     LookupRequest,
     WatchlistCreateRequest,
@@ -506,6 +507,15 @@ async def inbound_vessel_telemetry() -> list[dict[str, str]]:
     ]
 
 
+@router.get("/api/v1/vessels/inbound")
+async def inbound_vessel_records() -> list[dict[str, str]]:
+    """Return the stable inbound-vessel contract used by dispatch clients."""
+    return [
+        {"vessel_name": "CMA CGM MARCO POLO", "voyage_number": "0AR82W1MA", "terminal": "LA_PIER_400", "eta": "2026-09-07T08:00:00Z", "projected_lfd_window": "2026-09-12", "congestion_index": "MODERATE"},
+        {"vessel_name": "MAERSK MC-KINNEY MOLLER", "voyage_number": "2412E", "terminal": "NY_RED_HOOK", "eta": "2026-09-08T14:30:00Z", "projected_lfd_window": "2026-09-14", "congestion_index": "NORMAL"},
+    ]
+
+
 @router.get("/api/v1/ledger/export", response_class=Response)
 async def export_ledger(
     watchlist: WatchlistService = Depends(get_watchlist_service),
@@ -565,15 +575,13 @@ async def test_webhook(
 
 @router.post("/api/v1/webhooks/driver-sms")
 async def dispatch_driver_sms(
-    request: WebhookTestRequest,
+    request: DriverSmsRequest,
     webhook: WebhookService = Depends(get_webhook_service),
 ) -> dict[str, object]:
     """Send a driver-ready SMS payload through the configured webhook gateway."""
-    terminal = request.terminal_id or "la_pier_400"
-    item = request.item or {"container_id": request.container_id or "DEMO1234567", "terminal_id": terminal,
-                            "status": "CRITICAL", "fees_due": max(request.fees_due, 1.0),
-                            "last_free_day": request.last_free_day or date.today().isoformat(),
-                            "urgency_level": "CRITICAL"}
+    terminal = request.terminal_id
+    item = {"container_id": request.container_id, "terminal_id": terminal, "status": "CRITICAL",
+            "fees_due": 1.0, "last_free_day": date.today().isoformat(), "urgency_level": "CRITICAL"}
     terminal_key = str(terminal).lower()
     if "fenix" in terminal_key:
         appointment_url = APPOINTMENT_PORTALS["fenix_pier_300"]
@@ -582,5 +590,10 @@ async def dispatch_driver_sms(
     else:
         appointment_url = APPOINTMENT_PORTALS.get(terminal_key, APPOINTMENT_PORTALS["la_pier_400"])
     sms = webhook.format_driver_sms(item, appointment_url)
-    payload = {"event": "driver_sms_alert", "message": sms, "container_id": item.get("container_id"), "appointment_url": appointment_url}
-    return await webhook.dispatch(payload, request.target_url)
+    payload = {"event": "driver_sms_alert", "message": sms, "container_id": request.container_id,
+               "phone_number": request.phone_number, "driver_name": request.driver_name,
+               "appointment_url": appointment_url}
+    delivery = await webhook.dispatch(payload, request.target_url)
+    return {"status": "dispatched", "container_id": request.container_id,
+            "phone_number": request.phone_number, "formatted_message": sms,
+            "timestamp": datetime.now(timezone.utc).isoformat(), "delivery": delivery}

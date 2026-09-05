@@ -247,6 +247,22 @@ def test_inbound_vessel_telemetry_endpoint_has_predictive_fields():
     assert response.json()[0]["congestion_index"] == "Moderate"
 
 
+def test_inbound_vessel_contract_and_driver_sms_aliases():
+    app = FastAPI()
+    app.include_router(router)
+    response = TestClient(app).get("/api/v1/vessels/inbound")
+    assert response.status_code == 200
+    assert response.json()[1]["voyage_number"] == "2412E"
+    sms = TestClient(app).post("/api/v1/webhooks/driver-sms", json={
+        "container_id": "CMAU4928104", "phone": "+12135550199", "driver_name": "Ava",
+        "terminal_id": "ny_red_hook",
+    })
+    assert sms.status_code == 200
+    assert sms.json()["status"] == "dispatched"
+    assert sms.json()["phone_number"] == "+12135550199"
+    assert "CMAU4928104" in sms.json()["formatted_message"]
+
+
 def test_manual_alert_poll_is_public_and_returns_audit_shape():
     class EmptyWatchlist:
         async def list_all(self):
