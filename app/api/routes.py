@@ -153,6 +153,16 @@ def _is_test_mode(value: object) -> bool:
 
 def _red_hook_response(container_id: str) -> ContainerStatusResponse:
     normalized = container_id.strip().upper()
+    if normalized == "CMAU4928104":
+        return ContainerStatusResponse(
+            container_id=normalized,
+            terminal_name="Port of NY/NJ - Red Hook",
+            status="DEMURRAGE_ACCRUING",
+            fees_due=300.0,
+            customs_hold=False,
+            last_free_day="2026-09-03",
+            location="RED HOOK / PIER 7",
+        )
     last_free_day = (date.today() + timedelta(days=3)).isoformat()
     if normalized in RED_HOOK_FIXTURES:
         return ContainerStatusResponse(

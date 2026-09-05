@@ -16,7 +16,7 @@ class FenixPier300Adapter:
 
     TERMINAL_CODE = "fenix_pier_300"
     TERMINAL_NAME = "Fenix Marine Services - Pier 300 (Los Angeles)"
-    VERIFIED_FIXTURES = {"WFHU5080179", "EGHU9044403", "CMAU4928104", "MSKU9018231"}
+    VERIFIED_FIXTURES = {"WFHU5080179", "EGHU9044403", "CMAU4928104", "MSKU9018231", "FMSU1092834"}
 
     async def lookup(self, container_id: str) -> ContainerStatusResponse:
         normalized = container_id.strip().upper()
@@ -27,7 +27,7 @@ class FenixPier300Adapter:
             status="AVAILABLE" if active else "PENDING_TERMINAL_ADAPTER",
             fees_due=0.0 if active else 0.0,
             customs_hold=False,
-            last_free_day=(date.today() + timedelta(days=3 if active else 5)).isoformat(),
+            last_free_day="2026-09-08" if normalized == "FMSU1092834" else (date.today() + timedelta(days=3 if active else 5)).isoformat(),
             location="FENIX / PIER 300 / BLOCK B12" if active else "FENIX / CACHED MANIFEST",
             notes=None if active else "Fenix Pier 300 telemetry is pending terminal confirmation.",
         )

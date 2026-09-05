@@ -160,9 +160,10 @@ def test_red_hook_fixture_returns_demo_telemetry_without_live_scraper():
         teardown_overrides()
 
     assert response.status_code == 200
-    assert response.json()["status"] == "AVAILABLE"
+    assert response.json()["status"] == "DEMURRAGE_ACCRUING"
+    assert response.json()["fees_due"] == 300.0
     assert response.json()["terminal_name"] == "Port of NY/NJ - Red Hook"
-    assert response.json()["last_free_day"] == (date.today() + timedelta(days=3)).isoformat()
+    assert response.json()["last_free_day"] == "2026-09-03"
 
 
 def test_red_hook_unknown_container_returns_private_preview_message():

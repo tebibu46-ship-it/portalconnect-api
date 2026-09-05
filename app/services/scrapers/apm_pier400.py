@@ -73,13 +73,15 @@ class APMPier400Adapter:
 
     @classmethod
     def _fixture_response(cls, container_id: str) -> ContainerStatusResponse:
+        normalized = container_id.strip().upper()
+        last_free_day = "2026-09-06" if normalized == "WFHU5080179" else "2099-12-31"
         return ContainerStatusResponse(
-            container_id=container_id.strip().upper(),
+            container_id=normalized,
             terminal_name=cls.TERMINAL_NAME,
             status="AVAILABLE",
             fees_due=0.0,
             customs_hold=False,
-            last_free_day="2099-12-31",
+            last_free_day=last_free_day,
             location="PIER 400 / TEST YARD",
         )
 
