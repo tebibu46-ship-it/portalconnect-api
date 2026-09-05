@@ -34,6 +34,7 @@ from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.watchlist import WatchlistService
 from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
+from app.services.dispute import build_dossier
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -468,6 +469,16 @@ async def poll_alerts_now(
         "dispatched_alerts": result["dispatched"],
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+
+@router.get("/api/v1/dispute/{container_id}")
+async def dispute_dossier(
+    container_id: str,
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+) -> dict[str, object]:
+    normalized = container_id.strip().upper()
+    row = next((item for item in await watchlist.list_all() if item["container_id"] == normalized), None)
+    return build_dossier(normalized, row)
 
 
 @router.get("/api/v1/ledger/export", response_class=Response)

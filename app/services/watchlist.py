@@ -51,6 +51,25 @@ class WatchlistService:
                 if name not in existing:
                     connection.execute(f"ALTER TABLE watchlist_containers ADD COLUMN {name} {definition}")
 
+    def seed_demo_units(self) -> int:
+        """Seed the standard fleet once, without overwriting real records."""
+
+        seeds = [
+            ("WFHU5080179", "LA_PIER_400", "AVAILABLE", 0.0, "2026-09-06", "CAUTION", "APM / PIER 400"),
+            ("CMAU4928104", "NY_RED_HOOK", "DEMURRAGE_ACCRUING", 300.0, "2026-09-03", "CRITICAL", "RED HOOK / PIER 7"),
+            ("FMSU1092834", "FENIX_PIER_300", "PENDING_TERMINAL_ADAPTER", 0.0, "2026-09-08", "SAFE", "FENIX / PIER 300"),
+        ]
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            count = connection.execute("SELECT COUNT(*) FROM watchlist_containers").fetchone()[0]
+            if count:
+                return 0
+            connection.executemany(
+                "INSERT INTO watchlist_containers (container_id, terminal_id, last_free_day, status, fees_due, last_polled_at, holds, urgency_level, notes, pinned_at, alert_sent_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, '')",
+                [(cid, terminal, lfd, status, fees, now, urgency, location, now) for cid, terminal, status, fees, lfd, urgency, location in seeds],
+            )
+        return len(seeds)
+
     async def upsert(
         self,
         container_id: str,

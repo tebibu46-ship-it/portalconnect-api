@@ -9,6 +9,7 @@ from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
 from app.services.watchlist import WatchlistService
+from app.services.dispute import build_dossier
 
 
 def test_fenix_adapter_returns_active_milestones():
@@ -161,6 +162,51 @@ def test_watchlist_alert_claim_prevents_duplicate_cycle_alerts(tmp_path):
         assert await service.claim_alert("WFHU5080179") is False
 
     asyncio.run(scenario())
+
+
+def test_watchlist_seed_populates_empty_database_once(tmp_path):
+    service = WatchlistService(tmp_path / "seed.db")
+    assert service.seed_demo_units() == 3
+    assert service.seed_demo_units() == 0
+
+    rows = asyncio.run(service.list_all())
+    assert {row["container_id"] for row in rows} == {"WFHU5080179", "CMAU4928104", "FMSU1092834"}
+
+
+def test_dispute_dossier_validates_tier_breakdown():
+    dossier = build_dossier("CMAU4928104", {
+        "terminal_id": "NY_RED_HOOK", "status": "DEMURRAGE_ACCRUING", "fees_due": 300.0,
+        "last_free_day": "2026-09-03", "last_polled_at": "2026-09-05T00:00:00+00:00",
+    })
+
+    assert dossier["tariff_tier_breakdown"]["days_1_4"]["rate_per_day"] == 150.0
+    assert dossier["contested_amount"] == 300.0
+    assert "OSRA-22" in dossier["statement"]
+
+
+def test_dispute_endpoint_returns_audit_grade_payload():
+    class DossierWatchlist:
+        async def list_all(self):
+            return [{
+                "container_id": "CMAU4928104", "terminal_id": "NY_RED_HOOK",
+                "status": "DEMURRAGE_ACCRUING", "fees_due": 300.0,
+                "last_free_day": "2026-09-03",
+                "last_polled_at": "2026-09-05T00:00:00+00:00",
+            }]
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_watchlist_service] = DossierWatchlist
+    try:
+        response = TestClient(app).get("/api/v1/dispute/CMAU4928104")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["container_id"] == "CMAU4928104"
+    assert payload["contested_amount"] == 300.0
+    assert "OSRA-22" in payload["statement"]
 
 
 def test_manual_alert_poll_is_public_and_returns_audit_shape():

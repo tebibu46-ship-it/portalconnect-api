@@ -25,6 +25,7 @@ async def _alert_poll_worker() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    get_watchlist_service().seed_demo_units()
     task = asyncio.create_task(_alert_poll_worker())
     try:
         yield
