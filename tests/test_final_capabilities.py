@@ -61,6 +61,25 @@ def test_ledger_export_returns_rfc4180_csv():
     assert "WFHU5080179,fenix_pier_300,AVAILABLE,,12.5,2099-12-31,CRITICAL," in response.text
 
 
+def test_empty_ledger_export_contains_demo_seed_rows():
+    class EmptyWatchlist:
+        async def list_all(self):
+            return []
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_watchlist_service] = EmptyWatchlist
+    try:
+        response = TestClient(app).get("/api/v1/ledger/export")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert "WFHU5080179" in response.text
+    assert "CMAU4928104" in response.text
+    assert "FMSU1092834" in response.text
+
+
 def test_webhook_builds_alert_for_fees_or_urgent_free_time():
     urgent = {"container_id": "WFHU5080179", "terminal_id": "fenix_pier_300", "status": "HOLD", "fees_due": 1.0, "last_free_day": "2099-12-31"}
     payload = WebhookService.build_alert(urgent)
