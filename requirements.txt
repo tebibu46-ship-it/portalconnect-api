@@ -9,3 +9,4 @@ pytest
 pytest-asyncio
 beautifulsoup4
 httpx
+python-multipart

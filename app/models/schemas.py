@@ -48,6 +48,32 @@ class WatchlistCreateRequest(BaseModel):
         return normalized
 
 
+class BatchTrackRequest(BaseModel):
+    """JSON input for bounded multi-container ingestion."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    containers: list[str] = Field(min_length=1, max_length=100)
+    terminal: str = Field(min_length=1)
+
+    @field_validator("terminal", mode="before")
+    @classmethod
+    def normalize_terminal(cls, value: Any) -> str:
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("terminal must be a non-empty string")
+        return value.strip().lower()
+
+    @field_validator("containers", mode="before")
+    @classmethod
+    def normalize_containers(cls, value: Any) -> list[str]:
+        if not isinstance(value, list):
+            raise ValueError("containers must be a list")
+        normalized = [item.strip().upper() if isinstance(item, str) else item for item in value]
+        if any(not isinstance(item, str) for item in normalized):
+            raise ValueError("container IDs must be strings")
+        return normalized
+
+
 class ContainerStatusResponse(BaseModel):
     """Stable response contract for container status lookups."""
 
@@ -71,3 +97,19 @@ class ErrorResponse(BaseModel):
     status_code: int
     error_code: str
     message: str
+
+
+class BatchContainerResult(BaseModel):
+    """One resilient result in a batch manifest."""
+
+    model_config = ConfigDict(extra="forbid", strict=True)
+
+    container_id: str
+    status: str
+    customs_hold: bool
+    fees_due: float
+    last_free_day: str
+    urgency_level: str
+    terminal_name: str
+    location: str
+    error: str | None = None
