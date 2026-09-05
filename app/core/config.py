@@ -18,6 +18,10 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     test_mode: bool = False
     api_key: str | None = None
+    rate_limit_per_minute: int = 120
+    rate_limit_enabled: bool = True
+    sms_webhook_url: str | None = None
+    ais_feed_url: str | None = None
 
 
 @lru_cache

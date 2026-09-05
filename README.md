@@ -41,3 +41,13 @@ The suite uses mocked browser and OpenAI clients, so it does not require network
 This repository includes a `render.yaml` Blueprint for zero-touch deployment on Render's free web-service tier. In the Render dashboard, choose **New → Blueprint**, connect this GitHub repository, and select the `main` branch. Render will detect `render.yaml`, build the Dockerfile, configure the service, and use `/healthz` as its health check.
 
 The Blueprint sets `TEST_MODE=true` and a test API key, so the free deployment runs without OpenAI credentials. For production use, replace `API_KEY` with a secret value and disable test mode in the Render service environment.
+
+## Production smoke test
+
+After Render finishes a deploy, run the checks below against the service URL:
+
+```powershell
+python scripts/production_smoke.py https://your-service.onrender.com
+```
+
+The script verifies health, terminal registry, inbound vessel telemetry, and CSV export. Configure `RATE_LIMIT_ENABLED`, `RATE_LIMIT_PER_MINUTE`, `SMS_WEBHOOK_URL`, and `AIS_FEED_URL` through the hosting provider's secret environment settings; never commit provider tokens or phone credentials.

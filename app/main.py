@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api.routes import get_watchlist_service, get_webhook_service, poll_watchlist_alerts, router
 from app.models.schemas import ErrorResponse
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError, PortalUnavailableError
+from app.services.rate_limit import RateLimiter
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="PortalConnect API", lifespan=lifespan)
+_rate_limiter = RateLimiter()
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.add_middleware(
     CORSMiddleware,
@@ -43,6 +45,26 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.middleware("http")
+async def production_request_guard(request: Request, call_next):
+    """Bound abusive API traffic and emit useful request timing diagnostics."""
+    started = asyncio.get_running_loop().time()
+    settings = __import__("app.core.config", fromlist=["get_settings"]).get_settings()
+    _rate_limiter.limit = max(1, settings.rate_limit_per_minute)
+    client_key = request.client.host if request.client else "unknown"
+    if settings.rate_limit_enabled and request.url.path.startswith("/api/") and request.method in {"POST", "DELETE"}:
+        if not _rate_limiter.allow(client_key):
+            return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded; retry shortly."})
+    try:
+        response = await call_next(request)
+    except Exception:
+        logger.exception("Unhandled request failure: %s %s", request.method, request.url.path)
+        raise
+    elapsed_ms = (asyncio.get_running_loop().time() - started) * 1000
+    logger.info("request method=%s path=%s status=%s duration_ms=%.1f", request.method, request.url.path, response.status_code, elapsed_ms)
+    return response
 
 
 @app.get("/", include_in_schema=False)
