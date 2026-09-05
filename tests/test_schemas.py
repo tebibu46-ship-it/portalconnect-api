@@ -11,6 +11,13 @@ def test_lookup_request_strips_and_uppercases_identifiers():
     assert request.container_id == "MSCU1234567"
 
 
+def test_lookup_request_accepts_tracking_aliases():
+    request = LookupRequest(container_number="wfhu5080179", terminal_id="apm_pier_400")
+
+    assert request.container_id == "WFHU5080179"
+    assert request.terminal_code == "APM_PIER_400"
+
+
 @pytest.mark.parametrize(
     "payload",
     [

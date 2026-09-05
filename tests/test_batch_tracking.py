@@ -56,6 +56,15 @@ def test_batch_json_allows_unauthenticated_post():
     assert response.json()["results"][0]["container_id"] == "WFHU5080179"
 
 
+def test_batch_route_accepts_terminal_id_alias():
+    response = client().post(
+        "/api/v1/track/batch",
+        json={"containers": ["WFHU5080179"], "terminal_id": "apm_pier_400"},
+    )
+
+    assert response.status_code == 200
+
+
 def test_batch_manifest_parses_messy_csv_whitespace():
     response = client().post(
         "/api/v1/track/batch",

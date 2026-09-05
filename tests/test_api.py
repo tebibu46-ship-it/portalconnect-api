@@ -105,12 +105,27 @@ def test_lookup_rejects_malformed_container_id():
     assert response.status_code == 422
 
 
+def test_tracking_route_accepts_container_number_and_terminal_id_aliases():
+    client = build_mock_client()
+    try:
+        response = client.post(
+            "/api/v1/track",
+            json={"container_number": "WFHU5080179", "terminal_id": "apm_pier_400"},
+        )
+    finally:
+        teardown_overrides()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "AVAILABLE"
+
+
 def test_terminals_returns_supported_registry():
     response = TestClient(app).get("/v1/terminals")
 
     assert response.status_code == 200
     assert response.json() == {
         "la_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
+        "apm_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
         "ny_red_hook": "https://portal.example.com/ny-red-hook",
     }
 

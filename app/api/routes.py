@@ -34,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 TERMINAL_REGISTRY = {
     "la_pier_400": APMPier400Adapter.PORTAL_URL,
+    "apm_pier_400": APMPier400Adapter.PORTAL_URL,
     "ny_red_hook": "https://portal.example.com/ny-red-hook",
 }
 RED_HOOK_FIXTURES = {
@@ -180,7 +181,7 @@ async def _lookup_result(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Unsupported terminal code")
     if _is_test_mode(settings.test_mode):
         return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
-    if terminal_code == "la_pier_400":
+    if terminal_code in {"la_pier_400", "apm_pier_400"}:
         return await apm_adapter.lookup(request.container_id)
     if terminal_code == "ny_red_hook":
         return _red_hook_response(request.container_id)

@@ -2,7 +2,7 @@
 
 from typing import Any
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class LookupRequest(BaseModel):
@@ -16,6 +16,21 @@ class LookupRequest(BaseModel):
         max_length=11,
         pattern=r"^[A-Z]{4}[0-9]{7}$",
     )
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_tracking_aliases(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "container_id" not in payload and "container_number" in payload:
+            payload["container_id"] = payload["container_number"]
+        if "terminal_code" not in payload:
+            payload["terminal_code"] = payload.get("terminal", payload.get("terminal_id"))
+        payload.pop("container_number", None)
+        payload.pop("terminal", None)
+        payload.pop("terminal_id", None)
+        return payload
 
     @field_validator("terminal_code", "container_id", mode="before")
     @classmethod
@@ -55,6 +70,17 @@ class BatchTrackRequest(BaseModel):
 
     containers: list[str] = Field(min_length=1, max_length=100)
     terminal: str = Field(min_length=1)
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_terminal_alias(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "terminal" not in payload and "terminal_id" in payload:
+            payload["terminal"] = payload["terminal_id"]
+        payload.pop("terminal_id", None)
+        return payload
 
     @field_validator("terminal", mode="before")
     @classmethod
