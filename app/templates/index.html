@@ -6,6 +6,9 @@
 <meta name="theme-color" content="#010105">
 <meta http-equiv="Cache-Control" content="no-store">
 <title>PortalConnect Container Tracker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/dispatch.css">
 </head>
 <body>
@@ -62,6 +65,7 @@
 </main>
 <footer class="inset"><a class="brand" href="#home">PORTALCONNECT</a><span class="mono">ONE DESK. EVERY HANDOFF.</span><a href="/docs">API documentation ↗</a></footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<div id="scroll-progress" aria-hidden="true"></div>
 <script src="/static/dispatch.js" defer></script>
 <script>
 document.addEventListener("DOMContentLoaded",()=>{
@@ -78,6 +82,16 @@ document.addEventListener("DOMContentLoaded",()=>{
   });
   document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")videos.forEach(resume)});
   window.setTimeout(()=>videos.forEach(resume),250);
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  document.documentElement.classList.add("motion-ready");
+  const progress=document.getElementById("scroll-progress"),sections=[...document.querySelectorAll("main>section")],links=[...document.querySelectorAll(".masthead nav a")];
+  const update=()=>{const max=document.documentElement.scrollHeight-innerHeight;if(progress)progress.style.width=(max>0?scrollY/max*100:0)+"%"};addEventListener("scroll",update,{passive:true});update();
+  const reveal=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting)entry.target.classList.add("is-visible")}),{threshold:.12});sections.forEach(section=>{section.classList.add("reveal");reveal.observe(section)});
+  const active=new IntersectionObserver(entries=>entries.forEach(entry=>{if(entry.isIntersecting)links.forEach(link=>link.setAttribute("aria-current",link.hash===`#${entry.target.id}`?"true":"false"))}),{rootMargin:"-35% 0px -55%"});sections.forEach(section=>{if(section.id)active.observe(section)});
+  if(!matchMedia("(prefers-reduced-motion: reduce)").matches)document.querySelectorAll(".action,.sample-chip").forEach(node=>{node.addEventListener("pointermove",event=>{const box=node.getBoundingClientRect();node.style.transform=`translate(${(event.clientX-box.left-box.width/2)*.035}px,${(event.clientY-box.top-box.height/2)*.035}px)`});node.addEventListener("pointerleave",()=>node.style.transform="")});
 });
 </script>
 </body>
