@@ -6,7 +6,7 @@ import secrets
 import asyncio
 import csv
 import io
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 import logging
 import re
 import os
@@ -458,11 +458,16 @@ async def poll_watchlist_alerts(watchlist: WatchlistService, webhook: WebhookSer
 
 @router.post("/api/v1/alerts/poll-now")
 async def poll_alerts_now(
-    _: None = Depends(require_api_key),
     watchlist: WatchlistService = Depends(get_watchlist_service),
     webhook: WebhookService = Depends(get_webhook_service),
 ) -> dict[str, object]:
-    return await poll_watchlist_alerts(watchlist, webhook)
+    result = await poll_watchlist_alerts(watchlist, webhook)
+    return {
+        "status": "ok",
+        "audited_containers": result["checked"],
+        "dispatched_alerts": result["dispatched"],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @router.get("/api/v1/ledger/export", response_class=Response)

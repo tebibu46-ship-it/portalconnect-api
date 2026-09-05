@@ -161,3 +161,23 @@ def test_watchlist_alert_claim_prevents_duplicate_cycle_alerts(tmp_path):
         assert await service.claim_alert("WFHU5080179") is False
 
     asyncio.run(scenario())
+
+
+def test_manual_alert_poll_is_public_and_returns_audit_shape():
+    class EmptyWatchlist:
+        async def list_all(self):
+            return []
+
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_watchlist_service] = EmptyWatchlist
+    try:
+        response = TestClient(app).post("/api/v1/alerts/poll-now")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "ok"
+    assert response.json()["audited_containers"] == 0
+    assert response.json()["dispatched_alerts"] == 0
+    assert response.json()["timestamp"]
