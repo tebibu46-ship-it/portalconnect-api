@@ -37,7 +37,7 @@
     async function copyWithFeedback(value,button){try{await navigator.clipboard.writeText(value);const old=button.textContent;button.textContent="Copied ✓";notify("Copied to clipboard");setTimeout(()=>button.textContent=old,1500)}catch{notify("Clipboard unavailable")}}
   </script>
   <script>
-    const apmSamples=document.querySelectorAll(".sample-chip");if(apmSamples.length>=2){apmSamples[0].dataset.sample="WFHU5080179";apmSamples[0].dataset.terminal="la_pier_400";apmSamples[0].firstChild.nodeValue="WFHU5080179 ";apmSamples[0].lastChild.textContent="(Pier 400)";apmSamples[1].dataset.sample="EGHU9044403";apmSamples[1].dataset.terminal="la_pier_400";apmSamples[1].firstChild.nodeValue="EGHU9044403 ";apmSamples[1].lastChild.textContent="(Pier 400)"}
+    const apmSamples=document.querySelectorAll(".sample-chip");if(apmSamples.length>=2){apmSamples[0].dataset.sample="WFHU5080179";apmSamples[0].dataset.terminal="la_pier_400";apmSamples[0].firstChild.nodeValue="WFHU5080179 ";apmSamples[0].lastChild.textContent="(Pier 400)";apmSamples[1].dataset.sample="CMAU4928104";apmSamples[1].dataset.terminal="ny_red_hook";apmSamples[1].firstChild.nodeValue="CMAU4928104 ";apmSamples[1].lastChild.textContent="(Red Hook)"}
   </script>
   <script>
     document.addEventListener("DOMContentLoaded",()=>{

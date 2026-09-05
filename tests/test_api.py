@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from datetime import date, timedelta
 from types import SimpleNamespace
 
 from app.api.routes import get_browser_service, get_vision_extractor
@@ -119,3 +120,44 @@ def test_healthz_returns_ok():
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_red_hook_fixture_returns_demo_telemetry_without_live_scraper():
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        api_key="integration-key",
+        test_mode=False,
+    )
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/v1/container/lookup",
+            headers={"X-API-Key": "integration-key"},
+            json={"terminal_code": "ny_red_hook", "container_id": "CMAU4928104"},
+        )
+    finally:
+        teardown_overrides()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "AVAILABLE"
+    assert response.json()["terminal_name"] == "Port of NY/NJ - Red Hook"
+    assert response.json()["last_free_day"] == (date.today() + timedelta(days=3)).isoformat()
+
+
+def test_red_hook_unknown_container_returns_private_preview_message():
+    app.dependency_overrides[get_settings] = lambda: Settings(
+        api_key="integration-key",
+        test_mode=False,
+    )
+    client = TestClient(app)
+    try:
+        response = client.post(
+            "/v1/container/lookup",
+            headers={"X-API-Key": "integration-key"},
+            json={"terminal_code": "ny_red_hook", "container_id": "ZZZZ1234567"},
+        )
+    finally:
+        teardown_overrides()
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "PENDING_TERMINAL_ADAPTER"
+    assert "private preview" in response.json()["notes"]
