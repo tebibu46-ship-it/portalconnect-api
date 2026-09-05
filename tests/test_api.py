@@ -109,7 +109,7 @@ def test_terminals_returns_supported_registry():
 
     assert response.status_code == 200
     assert response.json() == {
-        "la_pier_400": "https://portal.example.com/la-pier-400",
+        "la_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
         "ny_red_hook": "https://portal.example.com/ny-red-hook",
     }
 

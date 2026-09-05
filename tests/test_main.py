@@ -1,6 +1,6 @@
 from fastapi.testclient import TestClient
 
-from app.api.routes import get_browser_service, get_vision_extractor
+from app.api.routes import get_apm_adapter, get_browser_service, get_vision_extractor
 from app.core.config import Settings, get_settings
 from app.main import app
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError
@@ -19,10 +19,22 @@ class UnusedExtractor:
         raise AssertionError("extractor should not be called")
 
 
+class BrowserAdapterBridge:
+    def __init__(self, browser):
+        self.browser = browser
+
+    async def lookup(self, container_id):
+        return await self.browser.capture_portal_state(
+            "https://www.apmterminals.com/en/los-angeles/practical-information/track-and-trace",
+            container_id,
+        )
+
+
 def request_with_browser(browser):
     app.dependency_overrides[get_settings] = lambda: Settings(api_key="test-key")
     app.dependency_overrides[get_browser_service] = lambda: browser
     app.dependency_overrides[get_vision_extractor] = UnusedExtractor
+    app.dependency_overrides[get_apm_adapter] = lambda: BrowserAdapterBridge(browser)
     client = TestClient(app, raise_server_exceptions=False)
     client.headers.update({"X-API-Key": "test-key"})
     return client

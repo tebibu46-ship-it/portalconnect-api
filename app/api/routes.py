@@ -11,11 +11,12 @@ from app.core.config import Settings, get_settings
 from app.models.schemas import ContainerStatusResponse, LookupRequest
 from app.services.browser import BrowserService
 from app.services.parser import VisionExtractor
+from app.services.scrapers import APMPier400Adapter
 
 router = APIRouter()
 
 TERMINAL_REGISTRY = {
-    "la_pier_400": "https://portal.example.com/la-pier-400",
+    "la_pier_400": APMPier400Adapter.PORTAL_URL,
     "ny_red_hook": "https://portal.example.com/ny-red-hook",
 }
 
@@ -60,6 +61,10 @@ def get_vision_extractor() -> VisionExtractor:
     return VisionExtractor()
 
 
+def get_apm_adapter() -> APMPier400Adapter:
+    return APMPier400Adapter()
+
+
 def _is_test_mode(value: object) -> bool:
     return str(value).lower() in ("true", "1", "t")
 
@@ -74,6 +79,7 @@ async def lookup_container(
     settings: Settings = Depends(get_settings),
     browser: BrowserService = Depends(get_browser_service),
     extractor: VisionExtractor = Depends(get_vision_extractor),
+    apm_adapter: APMPier400Adapter = Depends(get_apm_adapter),
 ) -> ContainerStatusResponse:
     """Capture and parse container status for a registered terminal."""
 
@@ -86,6 +92,9 @@ async def lookup_container(
 
     if _is_test_mode(settings.test_mode):
         return ContainerStatusResponse.model_validate(VisionExtractor.MOCK_RESPONSE)
+
+    if request.terminal_code.lower() == "la_pier_400":
+        return await apm_adapter.lookup(request.container_id)
 
     screenshot = await browser.capture_portal_state(portal_url, request.container_id)
     page_html = getattr(browser, "last_page_html", None)

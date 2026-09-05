@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 from app.api.routes import router
 from app.models.schemas import ErrorResponse
-from app.services.browser import CaptchaDetectedError, PortalTimeoutError
+from app.services.browser import CaptchaDetectedError, PortalTimeoutError, PortalUnavailableError
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +54,14 @@ async def captcha_detected_handler(
     exc: CaptchaDetectedError,
 ) -> JSONResponse:
     return _error_response(422, "CAPTCHA_DETECTED", str(exc) or "CAPTCHA detected")
+
+
+@app.exception_handler(PortalUnavailableError)
+async def portal_unavailable_handler(
+    request: Request,
+    exc: PortalUnavailableError,
+) -> JSONResponse:
+    return _error_response(503, "PORTAL_UNAVAILABLE", str(exc) or "Portal unavailable")
 
 
 @app.exception_handler(Exception)
