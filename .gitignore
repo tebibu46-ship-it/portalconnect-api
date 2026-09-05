@@ -6,6 +6,7 @@ venv/
 .pytest_cache/
 .playwright/
 screenshots/
+data/
 
 # Local build and tooling artifacts
 *.egg-info/
