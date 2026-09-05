@@ -10,6 +10,7 @@ from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
 from app.services.watchlist import WatchlistService
 from app.services.dispute import build_dossier
+from app.services.vessel import get_inbound_vessels
 
 
 def test_fenix_adapter_returns_active_milestones():
@@ -261,6 +262,12 @@ def test_inbound_vessel_contract_and_driver_sms_aliases():
     assert sms.json()["status"] == "dispatched"
     assert sms.json()["phone_number"] == "+12135550199"
     assert "CMAU4928104" in sms.json()["formatted_message"]
+
+
+def test_vessel_feed_falls_back_without_external_url():
+    records = asyncio.run(get_inbound_vessels())
+    assert records[0]["terminal"] == "LA_PIER_400"
+    assert records[0]["projected_lfd_window"] == "2026-09-12"
 
 
 def test_manual_alert_poll_is_public_and_returns_audit_shape():

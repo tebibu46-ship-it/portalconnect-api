@@ -36,6 +36,7 @@ from app.services.watchlist import WatchlistService
 from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
 from app.services.dispute import build_dossier, render_printable_dossier
+from app.services.vessel import get_inbound_vessels
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -508,12 +509,9 @@ async def inbound_vessel_telemetry() -> list[dict[str, str]]:
 
 
 @router.get("/api/v1/vessels/inbound")
-async def inbound_vessel_records() -> list[dict[str, str]]:
+async def inbound_vessel_records(settings: Settings = Depends(get_settings)) -> list[dict[str, str]]:
     """Return the stable inbound-vessel contract used by dispatch clients."""
-    return [
-        {"vessel_name": "CMA CGM MARCO POLO", "voyage_number": "0AR82W1MA", "terminal": "LA_PIER_400", "eta": "2026-09-07T08:00:00Z", "projected_lfd_window": "2026-09-12", "congestion_index": "MODERATE"},
-        {"vessel_name": "MAERSK MC-KINNEY MOLLER", "voyage_number": "2412E", "terminal": "NY_RED_HOOK", "eta": "2026-09-08T14:30:00Z", "projected_lfd_window": "2026-09-14", "congestion_index": "NORMAL"},
-    ]
+    return await get_inbound_vessels(settings.ais_feed_url)
 
 
 @router.get("/api/v1/ledger/export", response_class=Response)
@@ -576,6 +574,7 @@ async def test_webhook(
 @router.post("/api/v1/webhooks/driver-sms")
 async def dispatch_driver_sms(
     request: DriverSmsRequest,
+    settings: Settings = Depends(get_settings),
     webhook: WebhookService = Depends(get_webhook_service),
 ) -> dict[str, object]:
     """Send a driver-ready SMS payload through the configured webhook gateway."""
@@ -593,7 +592,7 @@ async def dispatch_driver_sms(
     payload = {"event": "driver_sms_alert", "message": sms, "container_id": request.container_id,
                "phone_number": request.phone_number, "driver_name": request.driver_name,
                "appointment_url": appointment_url}
-    delivery = await webhook.dispatch(payload, request.target_url)
+    delivery = await webhook.dispatch(payload, request.target_url or settings.sms_webhook_url)
     return {"status": "dispatched", "container_id": request.container_id,
             "phone_number": request.phone_number, "formatted_message": sms,
             "timestamp": datetime.now(timezone.utc).isoformat(), "delivery": delivery}
