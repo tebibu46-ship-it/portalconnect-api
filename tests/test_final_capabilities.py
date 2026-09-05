@@ -50,12 +50,13 @@ def test_ledger_export_returns_rfc4180_csv():
     app.dependency_overrides[get_settings] = lambda: Settings(api_key="secret")
     app.dependency_overrides[get_watchlist_service] = FakeWatchlist
     try:
-        response = TestClient(app).get("/api/v1/ledger/export", headers={"X-API-Key": "secret"})
+        response = TestClient(app).get("/api/v1/ledger/export")
     finally:
         app.dependency_overrides.clear()
 
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/csv")
+    assert response.headers["content-disposition"] == "attachment; filename=demurrage_ledger.csv"
     assert response.text.splitlines()[0] == "Container ID,Terminal,Status,Holds,Fees Due,Last Free Day,Urgency Level,Timestamp"
     assert "WFHU5080179,fenix_pier_300,AVAILABLE,,12.5,2099-12-31,CRITICAL," in response.text
 
@@ -68,3 +69,15 @@ def test_webhook_builds_alert_for_fees_or_urgent_free_time():
     assert payload["event"] == "demurrage_risk"
     assert payload["urgency_level"] == "CRITICAL"
     assert WebhookService.build_alert({"fees_due": 0, "last_free_day": "2099-12-31"}) is None
+
+
+def test_webhook_test_accepts_url_and_container_number_aliases():
+    app = FastAPI()
+    app.include_router(router)
+    response = TestClient(app).post(
+        "/api/v1/webhooks/test",
+        json={"url": "https://hooks.example.test/portal", "container_number": "WFHU5080179"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["payload"]["container_id"] == "WFHU5080179"

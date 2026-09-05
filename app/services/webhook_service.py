@@ -49,9 +49,12 @@ class WebhookService:
         target = self.register(target_url) if target_url else next(iter(self._targets), None)
         if not target:
             return {"delivered": False, "payload": payload, "reason": "No webhook target registered"}
-        async with self._client_factory(timeout=5.0) as client:
-            response = await client.post(target, json=payload)
-            response.raise_for_status()
+        try:
+            async with self._client_factory(timeout=5.0) as client:
+                response = await client.post(target, json=payload)
+                response.raise_for_status()
+        except httpx.HTTPError as exc:
+            return {"delivered": False, "target_url": target, "payload": payload, "reason": str(exc)}
         return {"delivered": True, "target_url": target, "payload": payload}
 
     async def poll_and_dispatch(self, watchlist: Any, target_url: str | None = None) -> list[dict[str, Any]]:

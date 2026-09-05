@@ -132,6 +132,26 @@ class WebhookTestRequest(BaseModel):
 
     target_url: str | None = None
     item: dict[str, Any] | None = None
+    container_id: str | None = None
+    terminal_id: str | None = None
+    fees_due: float = 0.0
+    last_free_day: str | None = None
+    status: str = "HOLD"
+
+    @model_validator(mode="before")
+    @classmethod
+    def accept_webhook_aliases(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        payload = dict(value)
+        if "target_url" not in payload:
+            payload["target_url"] = payload.get("url", payload.get("webhook_url"))
+        if "container_id" not in payload and "container_number" in payload:
+            payload["container_id"] = payload["container_number"]
+        payload.pop("url", None)
+        payload.pop("webhook_url", None)
+        payload.pop("container_number", None)
+        return payload
 
 
 class BatchContainerResult(BaseModel):

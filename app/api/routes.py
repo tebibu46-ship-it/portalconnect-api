@@ -401,7 +401,6 @@ async def delete_watchlist_container(
 
 @router.get("/api/v1/ledger/export", response_class=Response)
 async def export_ledger(
-    _: None = Depends(require_api_key),
     watchlist: WatchlistService = Depends(get_watchlist_service),
 ) -> Response:
     """Export the persisted risk ledger as RFC-4180 CSV."""
@@ -419,7 +418,7 @@ async def export_ledger(
     return Response(
         content=output.getvalue(),
         media_type="text/csv",
-        headers={"Content-Disposition": "attachment; filename=demurrage_ledger_export.csv"},
+        headers={"Content-Disposition": "attachment; filename=demurrage_ledger.csv"},
     )
 
 
@@ -442,8 +441,11 @@ async def test_webhook(
     webhook: WebhookService = Depends(get_webhook_service),
 ) -> dict[str, object]:
     item = request.item or {
-        "container_id": "DEMO1234567", "terminal_id": "la_pier_400", "status": "HOLD",
-        "fees_due": 25.0, "last_free_day": date.today().isoformat(),
+        "container_id": request.container_id or "DEMO1234567",
+        "terminal_id": request.terminal_id or "la_pier_400",
+        "status": request.status,
+        "fees_due": request.fees_due,
+        "last_free_day": request.last_free_day or date.today().isoformat(),
     }
     payload = webhook.build_alert(item)
     if payload is None:
