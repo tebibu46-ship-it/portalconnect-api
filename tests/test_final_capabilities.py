@@ -3,11 +3,12 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.routes import get_apm_adapter, get_browser_service, get_fenix_adapter, get_settings, get_watchlist_service, router
+from app.api.routes import APPOINTMENT_PORTALS, get_apm_adapter, get_browser_service, get_fenix_adapter, get_settings, get_watchlist_service, router
 from app.core.config import Settings
 from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.webhook_service import WebhookService
 from app.services.demurrage import calculate_exposure
+from app.services.watchlist import WatchlistService
 
 
 def test_fenix_adapter_returns_active_milestones():
@@ -138,3 +139,25 @@ def test_watchlist_sync_repolls_all_persisted_units():
     assert response.status_code == 200
     assert response.json()["succeeded"] == 1
     assert watchlist.saved == ["WFHU5080179"]
+
+
+def test_appointment_portals_resolve_each_terminal():
+    assert APPOINTMENT_PORTALS["la_pier_400"].endswith("term-point")
+    assert APPOINTMENT_PORTALS["fenix_pier_300"].endswith("appointments")
+    assert APPOINTMENT_PORTALS["ny_red_hook"] == "https://bpt.bavariaportal.com/"
+
+
+def test_watchlist_alert_claim_prevents_duplicate_cycle_alerts(tmp_path):
+    service = WatchlistService(tmp_path / "dedupe.db")
+
+    async def scenario():
+        from app.models.schemas import ContainerStatusResponse
+        result = ContainerStatusResponse(
+            container_id="WFHU5080179", terminal_name="Fenix", status="HOLD", fees_due=1.0,
+            customs_hold=False, last_free_day="2026-09-06", location="B12",
+        )
+        await service.upsert("WFHU5080179", "fenix_pier_300", result)
+        assert await service.claim_alert("WFHU5080179") is True
+        assert await service.claim_alert("WFHU5080179") is False
+
+    asyncio.run(scenario())

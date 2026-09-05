@@ -3,19 +3,37 @@
 import logging
 from pathlib import Path
 import traceback
+import asyncio
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from app.api.routes import router
+from app.api.routes import get_watchlist_service, get_webhook_service, poll_watchlist_alerts, router
 from app.models.schemas import ErrorResponse
 from app.services.browser import CaptchaDetectedError, PortalTimeoutError, PortalUnavailableError
 
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="PortalConnect API")
+async def _alert_poll_worker() -> None:
+    while True:
+        await poll_watchlist_alerts(get_watchlist_service(), get_webhook_service())
+        await asyncio.sleep(3600)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_alert_poll_worker())
+    try:
+        yield
+    finally:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+
+
+app = FastAPI(title="PortalConnect API", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="app/static"), name="static")
 app.add_middleware(
     CORSMiddleware,

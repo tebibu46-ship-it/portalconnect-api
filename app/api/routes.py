@@ -44,6 +44,12 @@ TERMINAL_REGISTRY = {
     "fenix_pier_300": {"name": "Fenix Marine Services - Pier 300 (Los Angeles)", "url": "https://www.fenixmarineservices.com/", "status": "ACTIVE"},
     "ny_red_hook": {"name": "Red Hook Container Terminal (New York)", "url": "https://portal.example.com/ny-red-hook", "status": "PREVIEW"},
 }
+APPOINTMENT_PORTALS = {
+    "la_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/term-point",
+    "apm_pier_400": "https://www.apmterminals.com/en/los-angeles/practical-information/term-point",
+    "fenix_pier_300": "https://www.fenixmarineservices.com/appointments",
+    "ny_red_hook": "https://bpt.bavariaportal.com/",
+}
 RED_HOOK_FIXTURES = {
     "CMAU4928100",
     "CMAU4928104",
@@ -438,6 +444,25 @@ async def sync_watchlist(
 
     refreshed = await asyncio.gather(*(refresh(row) for row in rows), return_exceptions=True)
     return {"total": len(rows), "succeeded": sum(not isinstance(item, Exception) for item in refreshed), "results": [item for item in refreshed if not isinstance(item, Exception)]}
+
+
+async def poll_watchlist_alerts(watchlist: WatchlistService, webhook: WebhookService) -> dict[str, object]:
+    rows = await watchlist.list_all()
+    dispatched: list[dict[str, object]] = []
+    for row in rows:
+        payload = webhook.build_alert(row)
+        if payload is not None and await watchlist.claim_alert(str(row["container_id"])):
+            dispatched.append(await webhook.dispatch(payload))
+    return {"checked": len(rows), "alerts": dispatched, "dispatched": len(dispatched)}
+
+
+@router.post("/api/v1/alerts/poll-now")
+async def poll_alerts_now(
+    _: None = Depends(require_api_key),
+    watchlist: WatchlistService = Depends(get_watchlist_service),
+    webhook: WebhookService = Depends(get_webhook_service),
+) -> dict[str, object]:
+    return await poll_watchlist_alerts(watchlist, webhook)
 
 
 @router.get("/api/v1/ledger/export", response_class=Response)

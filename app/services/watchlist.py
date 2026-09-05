@@ -46,6 +46,7 @@ class WatchlistService:
                 "urgency_level": "TEXT NOT NULL DEFAULT 'UNKNOWN'",
                 "notes": "TEXT NOT NULL DEFAULT ''",
                 "pinned_at": "TEXT NOT NULL DEFAULT ''",
+                "alert_sent_at": "TEXT NOT NULL DEFAULT ''",
             }.items():
                 if name not in existing:
                     connection.execute(f"ALTER TABLE watchlist_containers ADD COLUMN {name} {definition}")
@@ -91,13 +92,24 @@ class WatchlistService:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, container_id, terminal_id, last_free_day, status, fees_due, last_polled_at, holds, urgency_level, notes, pinned_at
+                SELECT id, container_id, terminal_id, last_free_day, status, fees_due, last_polled_at, holds, urgency_level, notes, pinned_at, alert_sent_at
                 FROM watchlist_containers
                 ORDER BY CASE WHEN last_free_day GLOB '????-??-??' THEN last_free_day ELSE '9999-12-31' END,
                          container_id
                 """
             ).fetchall()
         return [dict(row) for row in rows]
+
+    async def claim_alert(self, container_id: str) -> bool:
+        """Atomically claim one alert slot for the current free-day cycle."""
+
+        now = datetime.now(timezone.utc).isoformat()
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "UPDATE watchlist_containers SET alert_sent_at = ? WHERE container_id = ? AND (alert_sent_at = '' OR alert_sent_at IS NULL)",
+                (now, container_id.strip().upper()),
+            )
+            return cursor.rowcount == 1
 
     async def remove(self, container_id: str) -> bool:
         with self._connect() as connection:
