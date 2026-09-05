@@ -166,6 +166,14 @@ async def _lookup_result(
     "/v1/container/lookup",
     response_model=ContainerStatusResponse,
 )
+@router.post(
+    "/api/v1/track",
+    response_model=ContainerStatusResponse,
+)
+@router.post(
+    "/track",
+    response_model=ContainerStatusResponse,
+)
 async def lookup_container(
     request: LookupRequest,
     _: None = Depends(require_api_key),
@@ -260,6 +268,7 @@ async def _parse_batch_input(request: Request) -> BatchTrackRequest:
 
 
 @router.post("/api/v1/track/batch")
+@router.post("/track/batch")
 async def batch_track(
     request: Request,
     settings: Settings = Depends(get_settings),

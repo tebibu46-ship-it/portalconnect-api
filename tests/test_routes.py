@@ -93,3 +93,19 @@ def test_lookup_route_rejects_invalid_api_key():
     )
 
     assert response.status_code == 403
+
+
+def test_tracking_aliases_resolve_under_api_and_root_prefixes():
+    client, _, _, _ = build_test_client()
+    payload = {"terminal_code": "la_pier_400", "container_id": "MSCU1234567"}
+
+    api_response = client.post("/api/v1/track", headers={"X-API-Key": "secret"}, json=payload)
+    root_response = client.post("/track", headers={"X-API-Key": "secret"}, json=payload)
+    batch_response = client.post(
+        "/track/batch",
+        json={"containers": ["MSCU1234567"], "terminal": "la_pier_400"},
+    )
+
+    assert api_response.status_code == 200
+    assert root_response.status_code == 200
+    assert batch_response.status_code == 200
