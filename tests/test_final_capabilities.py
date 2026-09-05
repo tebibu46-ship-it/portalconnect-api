@@ -3,10 +3,11 @@ import asyncio
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-from app.api.routes import get_fenix_adapter, get_settings, get_watchlist_service, router
+from app.api.routes import get_apm_adapter, get_browser_service, get_fenix_adapter, get_settings, get_watchlist_service, router
 from app.core.config import Settings
 from app.services.terminal_adapters import FenixPier300Adapter
 from app.services.webhook_service import WebhookService
+from app.services.demurrage import calculate_exposure
 
 
 def test_fenix_adapter_returns_active_milestones():
@@ -100,3 +101,40 @@ def test_webhook_test_accepts_url_and_container_number_aliases():
 
     assert response.status_code == 200
     assert response.json()["payload"]["container_id"] == "WFHU5080179"
+
+
+def test_demurrage_tiers_calculate_four_day_and_day_five_rates():
+    rows = [{"last_free_day": "2026-09-05"}, {"last_free_day": "2026-09-05"}]
+
+    assert calculate_exposure(rows, __import__("datetime").date(2026, 9, 10)) == 2 * (4 * 150 + 1 * 300)
+
+
+def test_watchlist_sync_repolls_all_persisted_units():
+    class SyncWatchlist:
+        def __init__(self):
+            self.rows = [{"container_id": "WFHU5080179", "terminal_id": "fenix_pier_300"}]
+            self.saved = []
+
+        async def list_all(self):
+            return self.rows
+
+        async def upsert(self, container_id, terminal_id, result):
+            self.saved.append(container_id)
+            return {"container_id": container_id, "status": result.status}
+
+    watchlist = SyncWatchlist()
+    app = FastAPI()
+    app.include_router(router)
+    app.dependency_overrides[get_settings] = lambda: Settings(api_key="secret", test_mode=False)
+    app.dependency_overrides[get_watchlist_service] = lambda: watchlist
+    app.dependency_overrides[get_fenix_adapter] = FenixPier300Adapter
+    app.dependency_overrides[get_apm_adapter] = lambda: object()
+    app.dependency_overrides[get_browser_service] = lambda: object()
+    try:
+        response = TestClient(app).post("/api/v1/watchlist/sync", headers={"X-API-Key": "secret"})
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["succeeded"] == 1
+    assert watchlist.saved == ["WFHU5080179"]
