@@ -18,6 +18,24 @@
   <style>
     .ops-hud{display:grid;grid-template-columns:repeat(3,1fr);margin:0 0 16px;border:1px solid var(--white-line);background:rgba(15,19,26,.82)}.ops-metric{position:relative;padding:17px 20px;border-right:1px solid var(--white-line)}.ops-metric:last-child{border-right:0}.ops-metric:before{position:absolute;top:0;left:0;width:30px;height:2px;background:var(--indigo);content:""}.ops-metric:nth-child(2):before{background:var(--green)}.ops-metric:nth-child(3):before{background:var(--amber)}.ops-label{display:block;color:#7d8998;font:500 9px var(--mono);letter-spacing:.14em;text-transform:uppercase}.ops-value{display:block;margin-top:7px;color:var(--paper);font:600 clamp(1.2rem,2.4vw,1.9rem) var(--mono)}.capability-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;margin:16px 0;background:var(--white-line);border:1px solid var(--white-line)}.capability{min-height:125px;padding:18px;background:rgba(15,19,26,.88);transition:background .3s var(--ease),transform .3s var(--ease)}.capability:hover{background:var(--panel);transform:translateY(-3px)}.capability-index{color:var(--indigo);font:500 10px var(--mono)}.capability h3{margin:24px 0 5px;color:var(--paper);font:600 14px var(--display);text-transform:uppercase}.capability p{margin:0;color:#7d8998;font-size:11px}.radar.scanning{overflow:hidden}.radar.scanning:after{animation:scan-ping .9s var(--ease) infinite}@keyframes scan-ping{0%{opacity:.3;transform:scale(.8)}50%{opacity:1;transform:scale(1.8)}100%{opacity:.3;transform:scale(.8)}}@media(max-width:850px){.ops-hud,.capability-grid{grid-template-columns:1fr}.ops-metric{border-right:0;border-bottom:1px solid var(--white-line)}.ops-metric:last-child{border-bottom:0}.capability{min-height:95px}}
   </style>
+  <style>
+    :root{--carbon:#010105;--graphite:#090b10;--panel:#0f131a;--panel-hover:#161b24;--signal:#2563eb;--signal-bright:#3b82f6;--clearance:#10b981;--caution:#f59e0b;--critical:#f43f5e;--ease-united:cubic-bezier(.25,1,.5,1)}
+    body{background:var(--carbon);background-image:radial-gradient(circle at 78% 0%,rgba(4,7,88,.4),transparent 33%),linear-gradient(rgba(255,255,255,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.025) 1px,transparent 1px);background-size:auto,48px 48px,48px 48px}
+    .page-shell{background:linear-gradient(180deg,rgba(1,1,5,.18),rgba(1,1,5,.82));border-color:rgba(255,255,255,.1)}
+    .topbar,.hero,.console-grid,#watchlist-ledger,.footer{animation:dispatch-reveal .8s var(--ease-united) both}
+    .topbar{animation-delay:.04s}.hero{animation-delay:.12s}.console-grid{animation-delay:.2s}#watchlist-ledger{animation-delay:.28s}
+    .brand,.docs-link,.tactical-chip,.track-action{transition:transform .35s var(--ease-united),box-shadow .35s var(--ease-united),border-color .35s var(--ease-united),background .35s var(--ease-united)}
+    .brand:hover,.docs-link:hover,.tactical-chip:hover{box-shadow:0 0 0 1px rgba(59,130,246,.3),0 10px 28px rgba(0,0,0,.25)}
+    .track-action{background:var(--signal);box-shadow:0 10px 28px rgba(37,99,235,.2)}.track-action:hover{background:var(--signal-bright);box-shadow:0 14px 34px rgba(37,99,235,.34)}.track-action:active{transform:translateY(2px) scale(.985)}
+    .panel,.ledger{background:rgba(15,19,26,.92);border-radius:4px;box-shadow:0 20px 50px rgba(0,0,0,.24),inset 0 1px rgba(255,255,255,.03)}.panel{border-top:2px solid var(--signal)}.ledger{border-top:2px solid var(--caution)}
+    .ops-hud,.capability-grid{border-radius:4px;box-shadow:0 12px 30px rgba(0,0,0,.2)}
+    .ops-value{font-size:clamp(1.25rem,2.5vw,2.25rem)}
+    .hero h1{font-size:clamp(3.2rem,8vw,7.8rem);letter-spacing:-.075em;line-height:.88}.hero h1 em{color:var(--signal-bright)}
+    .dispatch-loader{border-color:rgba(255,255,255,.25);border-top-color:var(--signal-bright);animation:dispatch-spin .7s linear infinite}
+    .journey-step.active .journey-node{background:var(--clearance);box-shadow:0 0 0 4px rgba(16,185,129,.12),0 0 18px rgba(16,185,129,.8);animation:node-pulse 1.8s ease-in-out infinite}.journey-step:nth-child(2).active .journey-node{animation-delay:.15s}.journey-step:nth-child(3).active .journey-node{animation-delay:.3s}.journey-step:nth-child(4).active .journey-node{animation-delay:.45s}
+    @keyframes dispatch-reveal{from{opacity:0;transform:translate3d(0,18px,0)}to{opacity:1;transform:none}}@keyframes dispatch-spin{to{transform:rotate(360deg)}}@keyframes node-pulse{50%{transform:scale(1.22);box-shadow:0 0 0 7px rgba(16,185,129,.06),0 0 24px rgba(16,185,129,.9)}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+  </style>
 </head>
 <body><div class="page-shell"><div class="wrap">
   <nav class="topbar" aria-label="Primary navigation"><a class="brand" href="/"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 5h6v6H4zM14 13h6v6h-6zM14 5h6v6h-6zM4 13h6v6H4zM10 8h4M10 16h4"/></svg></span><span class="brand-word">PortalConnect</span></a><div class="top-actions"><span class="beacon"><i></i> Engine online</span><a class="docs-link" href="/docs">API docs ↗</a></div></nav>
@@ -51,6 +69,23 @@ document.addEventListener("DOMContentLoaded",()=>{
   const magnetic=[document.getElementById("track-btn"),...document.querySelectorAll(".sample-chip,.docs-link,.brand")].filter(Boolean);if(!reduced)magnetic.forEach(node=>{node.addEventListener("mousemove",event=>{const box=node.getBoundingClientRect(),x=(event.clientX-(box.left+box.width/2))*.08,y=(event.clientY-(box.top+box.height/2))*.08;node.style.transform=`translate3d(${x}px,${y}px,0)`});node.addEventListener("mouseleave",()=>{node.style.transform=""})});
   const track=document.getElementById("track-btn"),radar=document.querySelector(".radar");track?.addEventListener("click",()=>radar?.classList.add("scanning"));
   try{if(window.initUI)window.initUI();if(window.gsap)gsap.from(".ops-metric,.capability",{opacity:0,y:12,stagger:.06,duration:.45,ease:"power3.out"})}catch(error){console.warn("Motion enhancement unavailable",error)}
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  const headline=document.querySelector(".hero h1"),eyebrow=document.querySelector(".hero .eyebrow"),copy=document.querySelector(".hero-copy");
+  if(eyebrow)eyebrow.textContent="GLOBAL FREIGHT & CONTAINER TELEMETRY";
+  if(headline)headline.innerHTML="ONE OPERATOR.<br><em>EVERY LEG OF THE JOURNEY.</em>";
+  if(copy)copy.textContent="Every leg of the journey. Unified port visibility under one terminal desk.";
+  const reduced=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+  const magnetize=node=>{if(!node||reduced)return;node.addEventListener("mousemove",event=>{const box=node.getBoundingClientRect(),x=(event.clientX-box.left-box.width/2)*.05,y=(event.clientY-box.top-box.height/2)*.05;node.style.transform=`translate3d(${x}px,${y}px,0)`});node.addEventListener("mouseleave",()=>{node.style.transform=""})};
+  [document.getElementById("track-btn"),...document.querySelectorAll(".sample-chip,.docs-link,.brand")].forEach(magnetize);
+  const revealTargets=[document.querySelector(".topbar"),document.querySelector(".hero"),document.getElementById("operations-hud"),document.querySelector(".console-grid"),document.getElementById("watchlist-ledger")].filter(Boolean);
+  revealTargets.forEach((node,index)=>{node.style.animationDelay=`${index*.08}s`;node.style.willChange="transform,opacity"});
+  const hud=document.getElementById("operations-hud");
+  if(hud&&!reduced){const observer=new IntersectionObserver(entries=>{if(entries.some(entry=>entry.isIntersecting)){hud.querySelectorAll("[data-count]").forEach((node,index)=>{node.dataset.counted="true";node.style.transitionDelay=`${index*.08}s`});observer.disconnect()}},{threshold:.25});observer.observe(hud)}
+  const track=document.getElementById("track-btn"),radar=document.querySelector(".radar");track?.addEventListener("click",()=>{radar?.classList.add("scanning");document.querySelectorAll("#telemetry-view .metric").forEach((node,index)=>{node.style.animation=`dispatch-reveal .55s var(--ease-united) ${index*.07}s both`})},{passive:true});
+  try{if(window.initUI)window.initUI();if(window.gsap&&typeof window.gsap.to==="function")window.gsap.to(".beacon i",{opacity:.45,repeat:-1,yoyo:true,duration:1.4,ease:"sine.inOut"})}catch(error){console.warn("Motion enhancement unavailable",error)}
 });
 </script>
 </body></html>
