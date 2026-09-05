@@ -31,6 +31,7 @@ async def root() -> FileResponse:
     return FileResponse(
         Path(__file__).parent / "templates" / "index.html",
         media_type="text/html",
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache", "Expires": "0"},
     )
 
 
