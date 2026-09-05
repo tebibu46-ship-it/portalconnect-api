@@ -18,7 +18,7 @@
 <main>
 <section id="home" class="hero">
   <div class="hero-copy inset"><p class="eyebrow">ONE OPERATOR. EVERY LEG OF THE JOURNEY.</p><h1>Unified freight &amp;<br>container telemetry<span>Across global terminals.</span></h1></div>
-  <div class="monitor"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/hero.png" aria-label="Monitor and container truck breakthrough"><source src="/static/videos/hero_breakthrough.mp4" type="video/mp4"></video></div>
+  <div class="hero-bg" aria-hidden="true"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/hero.png"><source src="/static/videos/hero_breakthrough.mp4" type="video/mp4"></video><div class="hero-bg-shade"></div></div>
   <div class="hero-foot inset"><span>01 / A SINGLE POINT OF VISIBILITY</span><button id="motion-toggle" type="button" aria-pressed="false">Pause motion Ⅱ</button><a href="#services">Explore the network ↓</a></div>
 </section>
 <section class="metrics inset" aria-label="Illustrative operating benchmarks">
@@ -26,7 +26,7 @@
   <small>Illustrative benchmarks / not live service measurements</small>
 </section>
 <section id="services" class="horizon">
-  <div class="horizon-sky"><span class="watermark" aria-hidden="true">OUR SERVICES</span><span class="speed mono">00 KM/H &nbsp; / &nbsp; INTERMODAL CORRIDOR</span><video class="truck" autoplay loop muted playsinline preload="metadata" poster="/static/posters/truck.png" aria-label="Side-profile container truck"><source src="/static/videos/truck_split.mp4" type="video/mp4"></video></div>
+  <div class="horizon-sky"><div class="horizon-bg" aria-hidden="true"><video class="truck" autoplay loop muted playsinline preload="metadata" poster="/static/posters/truck.png"><source src="/static/videos/truck_split.mp4" type="video/mp4"></video></div><span class="watermark" aria-hidden="true">OUR SERVICES</span><span class="speed mono">00 KM/H &nbsp; / &nbsp; INTERMODAL CORRIDOR</span></div>
   <div class="horizon-copy inset"><h2>Everything your<br>freight needs.<br><span>Under one group.</span></h2><div><p>From arrival to release, connect the signals that move your freight forward.</p><p>Container availability, terminal holds and free-day risk. One desk for your next decision.</p><a href="#desk">Open the operations desk ↗</a><p class="mono lane">USLAX → USNYC / TERMINAL NETWORK</p></div></div>
 </section>
 <section id="desk" class="desk inset">
@@ -44,7 +44,7 @@
   <a class="docs" href="/docs">Developer documentation ↗</a>
  </div>
  <section class="telemetry-panel" aria-label="Container telemetry">
-  <div id="standby-view" class="standby"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/vessel.png" aria-hidden="true"><source src="/static/videos/vessel_aerial.mp4" type="video/mp4"></video><div class="ocean-caption"><p class="eyebrow">THE NEXT MOVE STARTS HERE</p><h2>Logistics that<br>works as hard<br>as you do.</h2></div><span class="gps">⊕ 33.73° N / 118.25° W<br>PORT REFERENCE / LOS ANGELES</span></div>
+  <div id="standby-view" class="standby"><div class="standby-bg" aria-hidden="true"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/vessel.png"><source src="/static/videos/vessel_aerial.mp4" type="video/mp4"></video><div class="standby-shade"></div></div><div class="ocean-caption"><p class="eyebrow">THE NEXT MOVE STARTS HERE</p><h2>Logistics that<br>works as hard<br>as you do.</h2></div><span class="gps">⊕ 33.73° N / 118.25° W<br>PORT REFERENCE / LOS ANGELES</span></div>
   <div id="telemetry-view" class="hidden telemetry" aria-live="polite">
    <div class="telemetry-head"><div><p class="eyebrow">MOVEMENT RECORD</p><h2 id="result-container"></h2></div><span id="status-badge"></span></div>
    <div id="journey" class="journey"><div class="journey-step"><span class="journey-node"></span>Discharged</div><div class="journey-step"><span class="journey-node"></span>Yard stack</div><div class="journey-step"><span class="journey-node"></span>Customs</div><div class="journey-step"><span class="journey-node"></span>Gate-out</div></div>
