@@ -18,7 +18,7 @@
 <main>
 <section id="home" class="hero">
   <div class="hero-copy inset"><p class="eyebrow">ONE OPERATOR. EVERY LEG OF THE JOURNEY.</p><h1>Unified freight &amp;<br>container telemetry<span>Across global terminals.</span></h1></div>
-  <div class="hero-bg" aria-hidden="true"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/hero.png"><source src="/static/videos/hero_breakthrough.mp4" type="video/mp4"></video><div class="hero-bg-shade"></div></div>
+  <div class="hero-bg" aria-hidden="true"><video autoplay loop muted playsinline webkit-playsinline preload="auto" disablePictureInPicture poster="/static/posters/hero.png" style="pointer-events:none;transform:translateZ(0);will-change:transform"><source src="/static/videos/hero_breakthrough.mp4" type="video/mp4"></video><div class="hero-bg-shade"></div></div>
   <div class="hero-foot inset"><span>01 / A SINGLE POINT OF VISIBILITY</span><button id="motion-toggle" type="button" aria-pressed="false">Pause motion Ⅱ</button><a href="#services">Explore the network ↓</a></div>
 </section>
 <section class="metrics inset" aria-label="Illustrative operating benchmarks">
@@ -26,7 +26,7 @@
   <small>Illustrative benchmarks / not live service measurements</small>
 </section>
 <section id="services" class="horizon">
-  <div class="horizon-sky"><div class="horizon-bg" aria-hidden="true"><video class="truck" autoplay loop muted playsinline preload="metadata" poster="/static/posters/truck.png"><source src="/static/videos/truck_split.mp4" type="video/mp4"></video></div><span class="watermark" aria-hidden="true">OUR SERVICES</span><span class="speed mono">00 KM/H &nbsp; / &nbsp; INTERMODAL CORRIDOR</span></div>
+  <div class="horizon-sky"><div class="horizon-bg" aria-hidden="true"><video class="truck" autoplay loop muted playsinline webkit-playsinline preload="auto" disablePictureInPicture poster="/static/posters/truck.png" style="pointer-events:none;transform:translateZ(0);will-change:transform"><source src="/static/videos/truck_split.mp4" type="video/mp4"></video></div><span class="watermark" aria-hidden="true">OUR SERVICES</span><span class="speed mono">00 KM/H &nbsp; / &nbsp; INTERMODAL CORRIDOR</span></div>
   <div class="horizon-copy inset"><h2>Everything your<br>freight needs.<br><span>Under one group.</span></h2><div><p>From arrival to release, connect the signals that move your freight forward.</p><p>Container availability, terminal holds and free-day risk. One desk for your next decision.</p><a href="#desk">Open the operations desk ↗</a><p class="mono lane">USLAX → USNYC / TERMINAL NETWORK</p></div></div>
 </section>
 <section id="desk" class="desk inset">
@@ -44,7 +44,7 @@
   <a class="docs" href="/docs">Developer documentation ↗</a>
  </div>
  <section class="telemetry-panel" aria-label="Container telemetry">
-  <div id="standby-view" class="standby"><div class="standby-bg" aria-hidden="true"><video autoplay loop muted playsinline preload="metadata" poster="/static/posters/vessel.png"><source src="/static/videos/vessel_aerial.mp4" type="video/mp4"></video><div class="standby-shade"></div></div><div class="ocean-caption"><p class="eyebrow">THE NEXT MOVE STARTS HERE</p><h2>Logistics that<br>works as hard<br>as you do.</h2></div><span class="gps">⊕ 33.73° N / 118.25° W<br>PORT REFERENCE / LOS ANGELES</span></div>
+  <div id="standby-view" class="standby"><div class="standby-bg" aria-hidden="true"><video autoplay loop muted playsinline webkit-playsinline preload="auto" disablePictureInPicture poster="/static/posters/vessel.png" style="pointer-events:none;transform:translateZ(0);will-change:transform"><source src="/static/videos/vessel_aerial.mp4" type="video/mp4"></video><div class="standby-shade"></div></div><div class="ocean-caption"><p class="eyebrow">THE NEXT MOVE STARTS HERE</p><h2>Logistics that<br>works as hard<br>as you do.</h2></div><span class="gps">⊕ 33.73° N / 118.25° W<br>PORT REFERENCE / LOS ANGELES</span></div>
   <div id="telemetry-view" class="hidden telemetry" aria-live="polite">
    <div class="telemetry-head"><div><p class="eyebrow">MOVEMENT RECORD</p><h2 id="result-container"></h2></div><span id="status-badge"></span></div>
    <div id="journey" class="journey"><div class="journey-step"><span class="journey-node"></span>Discharged</div><div class="journey-step"><span class="journey-node"></span>Yard stack</div><div class="journey-step"><span class="journey-node"></span>Customs</div><div class="journey-step"><span class="journey-node"></span>Gate-out</div></div>
@@ -63,5 +63,22 @@
 <footer class="inset"><a class="brand" href="#home">PORTALCONNECT</a><span class="mono">ONE DESK. EVERY HANDOFF.</span><a href="/docs">API documentation ↗</a></footer>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 <script src="/static/dispatch.js" defer></script>
+<script>
+document.addEventListener("DOMContentLoaded",()=>{
+  const videos=[...document.querySelectorAll(".hero-bg video,.horizon-bg video,.standby-bg video")];
+  let pageLeaving=false;
+  const stopRecovery=()=>{pageLeaving=true;videos.forEach(video=>{video.dataset.userPaused="true";video.pause()})};
+  addEventListener("pagehide",stopRecovery,{once:true});
+  addEventListener("beforeunload",stopRecovery,{once:true});
+  const resume=video=>{if(!pageLeaving&&!document.hidden&&document.visibilityState==="visible"&&video.dataset.userPaused!=="true"&&video.dataset.inView!=="false")video.play().catch(()=>{})};
+  videos.forEach(video=>{
+    video.addEventListener("ended",()=>{video.currentTime=0;resume(video)});
+    video.addEventListener("timeupdate",()=>{if(video.duration&&video.currentTime>=video.duration-.15){video.currentTime=0;resume(video)}});
+    video.addEventListener("pause",()=>resume(video));
+  });
+  document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")videos.forEach(resume)});
+  window.setTimeout(()=>videos.forEach(resume),250);
+});
+</script>
 </body>
 </html>
